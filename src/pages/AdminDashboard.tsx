@@ -1,6 +1,8 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Users, FileText, BarChart3, Settings } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Users, FileText, BarChart3, Settings, ShieldCheck, Calendar } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const AdminDashboard = () => {
   return (
@@ -61,51 +63,67 @@ const AdminDashboard = () => {
           </Card>
         </div>
 
-        <div className="grid md:grid-cols-2 gap-6">
-          <Card className="p-6">
-            <h2 className="text-xl font-semibold mb-4">Quick Actions</h2>
-            <div className="space-y-3">
-              <Button className="w-full justify-start" variant="outline">
-                <Users className="mr-2 h-4 w-4" />
-                Manage Users
-              </Button>
-              <Button className="w-full justify-start" variant="outline">
-                <FileText className="mr-2 h-4 w-4" />
-                Manage Questions
-              </Button>
-              <Button className="w-full justify-start" variant="outline">
-                <BarChart3 className="mr-2 h-4 w-4" />
-                View Results
-              </Button>
-              <Button className="w-full justify-start" variant="outline">
-                <Settings className="mr-2 h-4 w-4" />
-                System Settings
-              </Button>
-            </div>
-          </Card>
-
-          <Card className="p-6">
-            <h2 className="text-xl font-semibold mb-4">Recent Activity</h2>
-            <div className="space-y-4 text-sm">
-              <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
-                <span>New user registration</span>
-                <span className="text-muted-foreground">2 min ago</span>
+        <Tabs defaultValue="verification" className="space-y-4">
+          <TabsList className="grid grid-cols-5">
+            <TabsTrigger value="verification">Verification</TabsTrigger>
+            <TabsTrigger value="bookings">Bookings</TabsTrigger>
+            <TabsTrigger value="questions">Questions</TabsTrigger>
+            <TabsTrigger value="results">Results</TabsTrigger>
+            <TabsTrigger value="audit">Audit</TabsTrigger>
+          </TabsList>
+          <TabsContent value="verification">
+            <Card className="p-6 space-y-3">
+              <h2 className="text-xl font-semibold flex items-center gap-2"><ShieldCheck className="h-5 w-5" /> Candidate Verification Queue</h2>
+              {["#V-1024 / Pending documents", "#V-1025 / Face mismatch warning", "#V-1026 / Awaiting admin decision"].map((item) => (
+                <div key={item} className="flex items-center justify-between p-3 rounded-md bg-muted">
+                  <span>{item}</span>
+                  <div className="space-x-2">
+                    <Button size="sm" variant="outline">Reject</Button>
+                    <Button size="sm">Approve</Button>
+                  </div>
+                </div>
+              ))}
+            </Card>
+          </TabsContent>
+          <TabsContent value="bookings">
+            <Card className="p-6 space-y-3">
+              <h2 className="text-xl font-semibold flex items-center gap-2"><Calendar className="h-5 w-5" /> Booking Management</h2>
+              <div className="flex items-center justify-between p-3 rounded-md bg-muted">
+                <span>Candidate C-3349 / 2026-05-02 / 10:00</span>
+                <Badge>Confirmed</Badge>
               </div>
-              <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
-                <span>Test completed (Pass)</span>
-                <span className="text-muted-foreground">15 min ago</span>
+              <div className="flex gap-2">
+                <Button variant="outline">Reschedule</Button>
+                <Button variant="outline">Cancel Booking</Button>
               </div>
-              <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
-                <span>Test completed (Fail)</span>
-                <span className="text-muted-foreground">1 hour ago</span>
+            </Card>
+          </TabsContent>
+          <TabsContent value="questions">
+            <Card className="p-6 space-y-3">
+              <h2 className="text-xl font-semibold flex items-center gap-2"><FileText className="h-5 w-5" /> Question Bank</h2>
+              <p className="text-sm text-muted-foreground">Manage imports, edits and publish cycles for test papers.</p>
+              <div className="flex gap-2">
+                <Button>Import Questions</Button>
+                <Button variant="outline">Publish Draft</Button>
               </div>
-              <div className="flex justify-between items-center p-3 bg-muted rounded-lg">
-                <span>Question bank updated</span>
-                <span className="text-muted-foreground">3 hours ago</span>
-              </div>
-            </div>
-          </Card>
-        </div>
+            </Card>
+          </TabsContent>
+          <TabsContent value="results">
+            <Card className="p-6 space-y-3">
+              <h2 className="text-xl font-semibold flex items-center gap-2"><BarChart3 className="h-5 w-5" /> Result Oversight</h2>
+              <p className="text-sm">Pass rate this week: <strong>72%</strong></p>
+              <Button variant="outline">Export Result Report</Button>
+            </Card>
+          </TabsContent>
+          <TabsContent value="audit">
+            <Card className="p-6 space-y-3">
+              <h2 className="text-xl font-semibold flex items-center gap-2"><Settings className="h-5 w-5" /> Audit Log</h2>
+              {["Admin A approved V-1024", "Admin B rejected V-1021", "Admin A published question set Q-14"].map((log) => (
+                <div key={log} className="p-3 rounded-md bg-muted text-sm">{log}</div>
+              ))}
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );

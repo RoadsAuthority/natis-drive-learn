@@ -6,6 +6,7 @@ import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { Clock, ChevronLeft, ChevronRight, Flag } from "lucide-react";
 import { mockQuestions } from "@/data/mockQuestions";
+import { fetchQuestions, markAttempt, saveAttempt } from "@/lib/natisApi";
 
 const Test = () => {
   const navigate = useNavigate();
@@ -13,12 +14,22 @@ const Test = () => {
   const [answers, setAnswers] = useState<{ [key: number]: string }>({});
   const [timeRemaining, setTimeRemaining] = useState(3600); // 60 minutes in seconds
   const [flagged, setFlagged] = useState<Set<number>>(new Set());
+  const [questions, setQuestions] = useState(mockQuestions);
+
+  useEffect(() => {
+    const loadQuestions = async () => {
+      const data = await fetchQuestions();
+      if (!data?.length) return;
+      setQuestions(data);
+    };
+    void loadQuestions();
+  }, []);
 
   useEffect(() => {
     const timer = setInterval(() => {
       setTimeRemaining((prev) => {
         if (prev <= 0) {
-          handleSubmit();
+          void handleSubmit();
           return 0;
         }
         return prev - 1;
@@ -39,7 +50,7 @@ const Test = () => {
   };
 
   const handleNext = () => {
-    if (currentQuestion < mockQuestions.length - 1) {
+    if (currentQuestion < questions.length - 1) {
       setCurrentQuestion(currentQuestion + 1);
     }
   };
@@ -60,26 +71,31 @@ const Test = () => {
     setFlagged(newFlagged);
   };
 
-  const handleSubmit = () => {
-    const score = mockQuestions.reduce((acc, q, idx) => {
+  const handleSubmit = async () => {
+    let score = questions.reduce((acc, q, idx) => {
       return acc + (answers[idx] === q.correctAnswer ? 1 : 0);
     }, 0);
-    const percentage = (score / mockQuestions.length) * 100;
+    const marked = await markAttempt(answers, questions.length);
+    if (marked?.score !== undefined) {
+      score = Number(marked.score);
+    }
+    const percentage = (score / questions.length) * 100;
     
     localStorage.setItem(
       "testResults",
       JSON.stringify({
         score,
-        total: mockQuestions.length,
+        total: questions.length,
         percentage: percentage.toFixed(1),
         passed: percentage >= 80,
       })
     );
+    await saveAttempt(score, questions.length, percentage, percentage >= 80);
     navigate("/results");
   };
 
-  const question = mockQuestions[currentQuestion];
-  const progress = ((currentQuestion + 1) / mockQuestions.length) * 100;
+  const question = questions[currentQuestion];
+  const progress = ((currentQuestion + 1) / questions.length) * 100;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background p-4 py-8">
@@ -95,7 +111,7 @@ const Test = () => {
                 </span>
               </div>
               <div className="text-sm text-muted-foreground">
-                Question {currentQuestion + 1} of {mockQuestions.length}
+                Question {currentQuestion + 1} of {questions.length}
               </div>
             </div>
             <div className="flex-1 min-w-[200px] max-w-xs">
@@ -151,8 +167,8 @@ const Test = () => {
             Previous
           </Button>
 
-          {currentQuestion === mockQuestions.length - 1 ? (
-            <Button onClick={handleSubmit} size="lg">
+          {currentQuestion === questions.length - 1 ? (
+            <Button onClick={() => void handleSubmit()} size="lg">
               Submit Test
             </Button>
           ) : (
@@ -167,7 +183,7 @@ const Test = () => {
         <Card className="p-6 mt-6 shadow-lg">
           <h3 className="font-semibold mb-4">Question Navigator</h3>
           <div className="grid grid-cols-10 gap-2">
-            {mockQuestions.map((_, idx) => (
+            {questions.map((_, idx) => (
               <button
                 key={idx}
                 onClick={() => setCurrentQuestion(idx)}

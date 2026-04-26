@@ -5,34 +5,94 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import LanguageSelection from "./pages/LanguageSelection";
 import Login from "./pages/Login";
-import PersonalInfo from "./pages/PersonalInfo";
+import ProfileVerification from "./pages/ProfileVerification";
 import TestInstructions from "./pages/TestInstructions";
 import Test from "./pages/Test";
 import Results from "./pages/Results";
 import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
+import EyeTest from "./pages/EyeTest";
+import Booking from "./pages/Booking";
+import ProtectedRoute from "./components/guards/ProtectedRoute";
+import VerifiedOnlyRoute from "./components/guards/VerifiedOnlyRoute";
+import { AuthProvider } from "./components/auth/AuthProvider";
 
 const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
-    <TooltipProvider>
-      <Toaster />
-      <Sonner />
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<LanguageSelection />} />
-          <Route path="/login" element={<Login />} />
-          <Route path="/personal-info" element={<PersonalInfo />} />
-          <Route path="/instructions" element={<TestInstructions />} />
-          <Route path="/test" element={<Test />} />
-          <Route path="/results" element={<Results />} />
-          <Route path="/admin" element={<AdminDashboard />} />
-          {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-          <Route path="*" element={<NotFound />} />
-        </Routes>
-      </BrowserRouter>
-    </TooltipProvider>
+    <AuthProvider>
+      <TooltipProvider>
+        <Toaster />
+        <Sonner />
+        <BrowserRouter>
+          <Routes>
+            <Route path="/" element={<LanguageSelection />} />
+            <Route path="/login" element={<Login />} />
+            <Route
+              path="/profile-verification"
+              element={
+                <ProtectedRoute>
+                  <ProfileVerification />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="/personal-info" element={<ProfileVerification />} />
+            <Route
+              path="/eye-test"
+              element={
+                <ProtectedRoute>
+                  <EyeTest />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/booking"
+              element={
+                <ProtectedRoute>
+                  <Booking />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/instructions"
+              element={
+                <ProtectedRoute>
+                  <TestInstructions />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/test"
+              element={
+                <ProtectedRoute>
+                  <VerifiedOnlyRoute>
+                    <Test />
+                  </VerifiedOnlyRoute>
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/results"
+              element={
+                <ProtectedRoute>
+                  <Results />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/admin"
+              element={
+                <ProtectedRoute role="admin">
+                  <AdminDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route path="*" element={<NotFound />} />
+          </Routes>
+        </BrowserRouter>
+      </TooltipProvider>
+    </AuthProvider>
   </QueryClientProvider>
 );
 

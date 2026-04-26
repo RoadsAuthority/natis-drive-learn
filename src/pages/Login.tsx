@@ -7,6 +7,7 @@ import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { LogIn, UserPlus, ArrowLeft } from "lucide-react";
+import { signIn, signUp } from "@/lib/auth";
 
 const Login = () => {
   const navigate = useNavigate();
@@ -19,26 +20,45 @@ const Login = () => {
     password: "",
   });
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Simulate login
-    if (loginData.email && loginData.password) {
-      localStorage.setItem("user", JSON.stringify({ email: loginData.email }));
-      toast.success("Login successful!");
-      navigate("/personal-info");
-    } else {
+    if (!loginData.email || !loginData.password) {
       toast.error("Please fill in all fields");
+      return;
+    }
+    try {
+      const { error } = await signIn(loginData.email, loginData.password);
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      toast.success("Login successful!");
+      navigate("/profile-verification");
+    } catch (error) {
+      toast.error((error as Error).message);
     }
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (Object.values(registerData).every((val) => val)) {
-      localStorage.setItem("user", JSON.stringify({ email: registerData.email }));
-      toast.success("Registration successful!");
-      navigate("/personal-info");
-    } else {
+    if (!Object.values(registerData).every((val) => val)) {
       toast.error("Please fill in all fields");
+      return;
+    }
+    try {
+      const { error } = await signUp(registerData.email, registerData.password, {
+        first_name: registerData.firstName,
+        surname: registerData.surname,
+        id_number: registerData.idNumber,
+      });
+      if (error) {
+        toast.error(error.message);
+        return;
+      }
+      toast.success("Registration successful! Check email for confirmation if required.");
+      navigate("/profile-verification");
+    } catch (error) {
+      toast.error((error as Error).message);
     }
   };
 

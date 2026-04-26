@@ -3,10 +3,18 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { CheckCircle2, XCircle, Download, Home } from "lucide-react";
+import { requestResultDocument } from "@/lib/natisApi";
+
+type TestResults = {
+  score: number;
+  total: number;
+  percentage: string;
+  passed: boolean;
+};
 
 const Results = () => {
   const navigate = useNavigate();
-  const [results, setResults] = useState<any>(null);
+  const [results, setResults] = useState<TestResults | null>(null);
 
   useEffect(() => {
     const stored = localStorage.getItem("testResults");
@@ -18,6 +26,24 @@ const Results = () => {
   }, [navigate]);
 
   if (!results) return null;
+
+  const downloadResult = async () => {
+    await requestResultDocument(results);
+    const documentText = [
+      "NaTIS Learner Test Result",
+      `Date: ${new Date().toLocaleDateString()}`,
+      `Score: ${results.score}/${results.total}`,
+      `Percentage: ${results.percentage}%`,
+      `Status: ${results.passed ? "PASSED" : "FAILED"}`,
+    ].join("\n");
+    const blob = new Blob([documentText], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "natis-result.txt";
+    link.click();
+    URL.revokeObjectURL(url);
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background flex items-center justify-center p-4">
@@ -70,7 +96,7 @@ const Results = () => {
                   Your certificate is available for download below.
                 </p>
               </div>
-              <Button size="lg" className="w-full md:w-auto">
+              <Button size="lg" className="w-full md:w-auto" onClick={() => void downloadResult()}>
                 <Download className="mr-2 h-4 w-4" />
                 Download Certificate
               </Button>
