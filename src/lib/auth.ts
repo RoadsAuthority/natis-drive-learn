@@ -24,8 +24,21 @@ export type UserProfile = {
   licence_code: string | null;
   role: UserRole;
   verification_status: VerificationStatus;
+  rejection_reason?: string | null;
   eye_test_status: EyeTestStatus;
   payment_status: PaymentStatus;
+  test_schedule?: {
+    can_take_test: boolean;
+    can_book_test: boolean;
+    test_block_reason: string | null;
+    booking_block_reason: string | null;
+    next_test_eligible_at: string | null;
+    next_booking_eligible_at: string | null;
+    license_collection_from: string | null;
+    last_attempt_at: string | null;
+    last_attempt_passed: boolean;
+    last_attempt_failed: boolean;
+  } | null;
 };
 
 export async function signIn(email: string, password: string) {
@@ -107,6 +120,7 @@ export async function getProfile(): Promise<UserProfile | null> {
         licence_code: null,
         role: "candidate",
         verification_status: "pending",
+        rejection_reason: null,
         eye_test_status: (localStorage.getItem("eyeTestStatus") as EyeTestStatus) ?? "pending",
         payment_status: (localStorage.getItem("paymentStatus") as PaymentStatus) ?? "pending",
       };
@@ -126,6 +140,7 @@ export async function getProfile(): Promise<UserProfile | null> {
       licence_code: parsed.licenceCode ?? null,
       role: "candidate",
       verification_status: "pending",
+      rejection_reason: null,
       eye_test_status: (localStorage.getItem("eyeTestStatus") as EyeTestStatus) ?? "pending",
       payment_status: (localStorage.getItem("paymentStatus") as PaymentStatus) ?? "pending",
     };

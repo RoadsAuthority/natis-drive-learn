@@ -1,73 +1,70 @@
-# Welcome to your Lovable project
+# Online Learner Licence Portal
 
-## Project info
+Full-stack assignment prototype: candidate registration, document verification, vision screening, booking/payment, monitored theory test, and verifier admin console.
 
-**URL**: https://lovable.dev/projects/5c5adf3e-7247-4993-9cb6-9e8cd38ffa81
+## Stack
 
-## How can I edit this code?
+- **Frontend:** React, Vite, TypeScript, Tailwind, shadcn/ui
+- **API:** Node.js, Express, JWT
+- **Database:** Neon (Postgres)
 
-There are several ways of editing your application.
+## Features
 
-**Use Lovable**
+- Candidate portal with step-by-step journey
+- Verifier console (approve/reject with reasons, bookings, flagged attempts, audit log)
+- Snellen-style vision screening + optional doctor letter
+- Timed theory test (70 questions, 80% pass) with webcam monitoring signals
+- Retake rules: 3 weeks between attempts, 13 weeks after a fail, collection date on pass
+- Study PDFs served from `RoadsAuth/`
 
-Simply visit the [Lovable Project](https://lovable.dev/projects/5c5adf3e-7247-4993-9cb6-9e8cd38ffa81) and start prompting.
+## Quick start (local)
 
-Changes made via Lovable will be committed automatically to this repo.
-
-**Use your preferred IDE**
-
-If you want to work locally using your own IDE, you can clone this repo and push changes. Pushed changes will also be reflected in Lovable.
-
-The only requirement is having Node.js & npm installed - [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating)
-
-Follow these steps:
-
-```sh
-# Step 1: Clone the repository using the project's Git URL.
-git clone <YOUR_GIT_URL>
-
-# Step 2: Navigate to the project directory.
-cd <YOUR_PROJECT_NAME>
-
-# Step 3: Install the necessary dependencies.
-npm i
-
-# Step 4: Start the development server with auto-reloading and an instant preview.
-npm run dev
+```bash
+npm install
 ```
 
-**Edit a file directly in GitHub**
+**`server/.env`** (copy from `server/.env.example`):
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+```env
+PORT=3001
+FRONTEND_ORIGIN=http://localhost:8080
+DATABASE_URL="postgresql://..."
+JWT_SECRET=your-long-secret
+ADMIN_EMAILS=your-email@example.com
+```
 
-**Use GitHub Codespaces**
+**Root `.env`** (copy from `.env.example`):
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+```env
+VITE_API_BASE_URL=http://localhost:3001
+VITE_ALLOW_SANDBOX_PAYMENT=true
+```
 
-## What technologies are used for this project?
+```bash
+npm run db:migrate
+npm run generate:questions
+npm run seed:questions -- --replace
+npm run dev:all
+```
 
-This project is built with:
+- App: http://localhost:8080  
+- API health: http://localhost:3001/api/health  
 
-- Vite
-- TypeScript
-- React
-- shadcn-ui
-- Tailwind CSS
+## Cloud deployment
 
-## How can I deploy this project?
+See **[DEPLOY.md](./DEPLOY.md)** — Cloudflare Pages + Render + Neon.
 
-Simply open [Lovable](https://lovable.dev/projects/5c5adf3e-7247-4993-9cb6-9e8cd38ffa81) and click on Share -> Publish.
+## Scripts
 
-## Can I connect a custom domain to my Lovable project?
+| Command | Purpose |
+|---------|---------|
+| `npm run dev` | Frontend only |
+| `npm run dev:api` | API only (watch mode) |
+| `npm run dev:all` | Both |
+| `npm run build` | Production frontend build |
+| `npm run start:api` | Production API |
+| `npm run db:migrate` | Apply SQL migrations |
 
-Yes, you can!
+## API docs
 
-To connect a domain, navigate to Project > Settings > Domains and click Connect Domain.
-
-Read more here: [Setting up a custom domain](https://docs.lovable.dev/features/custom-domain#custom-domain)
+See [server/README.md](./server/README.md) for endpoints and schema.

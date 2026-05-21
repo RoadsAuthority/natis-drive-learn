@@ -13,9 +13,14 @@ import AdminDashboard from "./pages/AdminDashboard";
 import NotFound from "./pages/NotFound";
 import EyeTest from "./pages/EyeTest";
 import Booking from "./pages/Booking";
+import StudyMaterials from "./pages/StudyMaterials";
 import ProtectedRoute from "./components/guards/ProtectedRoute";
 import VerifiedOnlyRoute from "./components/guards/VerifiedOnlyRoute";
+import NotRejectedRoute from "./components/guards/NotRejectedRoute";
+import BookingReadyRoute from "./components/guards/BookingReadyRoute";
+import NonAdminRoute from "./components/guards/NonAdminRoute";
 import { AuthProvider } from "./components/auth/AuthProvider";
+import Portal from "./pages/Portal";
 
 const queryClient = new QueryClient();
 
@@ -28,11 +33,27 @@ const App = () => (
         <BrowserRouter>
           <Routes>
             <Route path="/" element={<LanguageSelection />} />
+            <Route
+              path="/study"
+              element={
+                <NonAdminRoute>
+                  <StudyMaterials />
+                </NonAdminRoute>
+              }
+            />
             <Route path="/login" element={<Login />} />
+            <Route
+              path="/portal"
+              element={
+                <ProtectedRoute role="candidate">
+                  <Portal />
+                </ProtectedRoute>
+              }
+            />
             <Route
               path="/profile-verification"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute role="candidate">
                   <ProfileVerification />
                 </ProtectedRoute>
               }
@@ -41,31 +62,37 @@ const App = () => (
             <Route
               path="/eye-test"
               element={
-                <ProtectedRoute>
-                  <EyeTest />
+                <ProtectedRoute role="candidate">
+                  <NotRejectedRoute>
+                    <EyeTest />
+                  </NotRejectedRoute>
                 </ProtectedRoute>
               }
             />
             <Route
               path="/booking"
               element={
-                <ProtectedRoute>
-                  <Booking />
+                <ProtectedRoute role="candidate">
+                  <BookingReadyRoute>
+                    <Booking />
+                  </BookingReadyRoute>
                 </ProtectedRoute>
               }
             />
             <Route
               path="/instructions"
               element={
-                <ProtectedRoute>
-                  <TestInstructions />
+                <ProtectedRoute role="candidate">
+                  <VerifiedOnlyRoute>
+                    <TestInstructions />
+                  </VerifiedOnlyRoute>
                 </ProtectedRoute>
               }
             />
             <Route
               path="/test"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute role="candidate">
                   <VerifiedOnlyRoute>
                     <Test />
                   </VerifiedOnlyRoute>
@@ -75,7 +102,7 @@ const App = () => (
             <Route
               path="/results"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute role="candidate">
                   <Results />
                 </ProtectedRoute>
               }

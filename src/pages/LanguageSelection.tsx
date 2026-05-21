@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Globe, ChevronRight } from "lucide-react";
+import { Globe, ChevronRight, BookOpen } from "lucide-react";
 
 const languages = [
   { code: "en", name: "English", nativeName: "English" },
@@ -29,7 +29,7 @@ const LanguageSelection = () => {
             <Globe className="w-10 h-10 text-primary" />
           </div>
           <h1 className="text-4xl font-bold text-foreground mb-3">
-            Welcome to NaTIS Learner's Licence System
+            Welcome to the Online Learner Licence System
           </h1>
           <p className="text-lg text-muted-foreground">
             Safe roads to prosperity
@@ -63,10 +63,20 @@ const LanguageSelection = () => {
             Continue
             <ChevronRight className="ml-2 h-5 w-5" />
           </Button>
+          <Button
+            type="button"
+            variant="outline"
+            size="lg"
+            className="w-full mt-3 text-lg"
+            onClick={() => navigate("/study")}
+          >
+            <BookOpen className="mr-2 h-5 w-5" />
+            Study materials (PDFs)
+          </Button>
         </Card>
 
         <p className="text-center text-sm text-muted-foreground mt-6">
-          © 2025 NaTIS - National Traffic Information System
+          © 2025 Learner Licence Portal — assignment prototype
         </p>
       </div>
     </div>

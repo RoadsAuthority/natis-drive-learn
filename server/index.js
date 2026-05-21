@@ -6,17 +6,76 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
 import { neon } from "@neondatabase/serverless";
-import { mkdir, writeFile } from "node:fs/promises";
+import { mkdir, writeFile, readdir } from "node:fs/promises";
+import { readFileSync } from "node:fs";
+import { createServer } from "node:http";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
+import { fileURLToPath } from "node:url";
+import { addDays, buildScheduleState, deriveReviewFlag } from "./lib/testSchedule.js";
 
-dotenv.config();
+const serverDir = path.dirname(fileURLToPath(import.meta.url));
+const envCandidates = [path.resolve(serverDir, ".env")];
+
+function loadServerEnvFallback() {
+  envCandidates.forEach((envPath) => {
+    dotenv.config({ path: envPath, override: true });
+    try {
+      const raw = readFileSync(envPath, "utf8");
+      raw.split(/\r?\n/).forEach((line) => {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) return;
+        const separator = trimmed.indexOf("=");
+        if (separator === -1) return;
+        const key = trimmed.slice(0, separator).trim();
+        let value = trimmed.slice(separator + 1).trim();
+        if (
+          (value.startsWith('"') && value.endsWith('"')) ||
+          (value.startsWith("'") && value.endsWith("'"))
+        ) {
+          value = value.slice(1, -1);
+        }
+        process.env[key] = value;
+      });
+    } catch {
+      // Ignore missing file; standard env variables may still be present.
+    }
+  });
+}
+
+loadServerEnvFallback();
+
+function readEnvValue(key) {
+  for (const envPath of envCandidates) {
+    try {
+      const raw = readFileSync(envPath, "utf8");
+      for (const line of raw.split(/\r?\n/)) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed.startsWith("#")) continue;
+        const separator = trimmed.indexOf("=");
+        if (separator === -1) continue;
+        const currentKey = trimmed.slice(0, separator).trim();
+        if (currentKey !== key) continue;
+        return trimmed.slice(separator + 1).trim().replace(/^["']|["']$/g, "");
+      }
+    } catch {
+      // Ignore missing files while checking candidates.
+    }
+  }
+  return undefined;
+}
 
 const app = express();
-const port = Number(process.env.PORT ?? 3001);
-const frontendOrigin = process.env.FRONTEND_ORIGIN ?? "http://localhost:8080";
-const jwtSecret = process.env.JWT_SECRET ?? "replace-this-in-production";
-const databaseUrl = process.env.DATABASE_URL;
+const port = Number(process.env.PORT ?? readEnvValue("PORT") ?? 3001);
+const frontendOrigin = process.env.FRONTEND_ORIGIN ?? readEnvValue("FRONTEND_ORIGIN") ?? "http://localhost:8080";
+const jwtSecret = process.env.JWT_SECRET ?? readEnvValue("JWT_SECRET") ?? "replace-this-in-production";
+const databaseUrl = process.env.DATABASE_URL ?? readEnvValue("DATABASE_URL");
+const adminEmailSet = new Set(
+  (process.env.ADMIN_EMAILS ?? readEnvValue("ADMIN_EMAILS") ?? "")
+    .split(",")
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean)
+);
 
 if (!databaseUrl) {
   throw new Error("Missing DATABASE_URL in environment variables.");
@@ -25,10 +84,66 @@ if (!databaseUrl) {
 const sql = neon(databaseUrl);
 const upload = multer({ storage: multer.memoryStorage() });
 const uploadsDir = path.resolve(process.cwd(), "server", "uploads");
+const roadsAuthDir = path.resolve(process.cwd(), "RoadsAuth");
 
-app.use(cors({ origin: frontendOrigin, credentials: false }));
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin) return callback(null, true);
+      if (origin === frontendOrigin) return callback(null, true);
+      try {
+        const { hostname } = new URL(origin);
+        if (hostname === "localhost" || hostname === "127.0.0.1") return callback(null, true);
+        if (/^192\.168\.\d{1,3}\.\d{1,3}$/.test(hostname)) return callback(null, true);
+        if (/^10\.\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(hostname)) return callback(null, true);
+        if (/^172\.(1[6-9]|2\d|3[0-1])\.\d{1,3}\.\d{1,3}$/.test(hostname)) return callback(null, true);
+      } catch {
+        // ignore
+      }
+      return callback(null, false);
+    },
+    credentials: false,
+  })
+);
 app.use(express.json({ limit: "5mb" }));
 app.use("/uploads", express.static(uploadsDir));
+app.use("/study-materials", express.static(roadsAuthDir));
+
+app.get("/api/health", async (_req, res) => {
+  try {
+    const [probe] = await sql`select now() as db_now`;
+    return res.json({
+      ok: true,
+      service: "natis-api",
+      db: "up",
+      db_now: probe?.db_now ?? null,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    return res.status(500).json({
+      ok: false,
+      service: "natis-api",
+      db: "down",
+      error: message,
+    });
+  }
+});
+
+app.get("/api/study-materials/list", async (_req, res) => {
+  try {
+    const names = await readdir(roadsAuthDir);
+    const pdfs = names.filter((n) => n.toLowerCase().endsWith(".pdf")).sort();
+    res.json({
+      basePath: "/study-materials",
+      files: pdfs.map((name) => ({
+        name,
+        url: `/study-materials/${encodeURIComponent(name)}`,
+      })),
+    });
+  } catch {
+    res.json({ basePath: "/study-materials", files: [] });
+  }
+});
 
 function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
@@ -45,6 +160,94 @@ function authMiddleware(req, res, next) {
   }
 }
 
+function adminMiddleware(req, res, next) {
+  if (req.user.role !== "admin") {
+    return res.status(403).json({ message: "Admin access required." });
+  }
+  return next();
+}
+
+function isMissingSchemaError(error) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("does not exist");
+}
+
+async function getLearnerSchedule(profileId) {
+  const [profile] = await sql`
+    select
+      id,
+      verification_status,
+      eye_test_status,
+      payment_status
+    from profiles
+    where id = ${profileId}
+    limit 1
+  `;
+  if (!profile) {
+    return null;
+  }
+
+  let scheduleFields = {
+    next_test_eligible_at: null,
+    next_booking_eligible_at: null,
+    license_collection_from: null,
+  };
+  try {
+    const [extra] = await sql`
+      select next_test_eligible_at, next_booking_eligible_at, license_collection_from
+      from profiles
+      where id = ${profileId}
+      limit 1
+    `;
+    if (extra) {
+      scheduleFields = extra;
+    }
+  } catch (error) {
+    if (!isMissingSchemaError(error)) {
+      throw error;
+    }
+  }
+
+  const [lastAttempt] = await sql`
+    select id, passed, created_at
+    from attempts
+    where profile_id = ${profileId}
+    order by created_at desc
+    limit 1
+  `;
+  const mergedProfile = { ...profile, ...scheduleFields };
+  return {
+    profile: mergedProfile,
+    lastAttempt: lastAttempt ?? null,
+    schedule: buildScheduleState(mergedProfile, lastAttempt ?? null),
+  };
+}
+
+async function assertLearnerTestReady(profileId) {
+  const learner = await getLearnerSchedule(profileId);
+  if (!learner) {
+    return { ok: false, status: 404, message: "Profile not found." };
+  }
+  const p = learner.profile;
+  if (p.verification_status !== "approved") {
+    return { ok: false, status: 403, message: "NaTIS: profile verification must be approved before the learner test." };
+  }
+  if (!["passed", "uploaded"].includes(p.eye_test_status)) {
+    return { ok: false, status: 403, message: "NaTIS: vision screening must be completed before the learner test." };
+  }
+  if (p.payment_status !== "paid") {
+    return { ok: false, status: 403, message: "NaTIS: booking payment must be completed before the learner test." };
+  }
+  if (!learner.schedule.canTakeTest) {
+    return {
+      ok: false,
+      status: 403,
+      message: learner.schedule.testBlockReason ?? "NaTIS: you are not eligible to take the test yet.",
+    };
+  }
+  return { ok: true };
+}
+
 async function ensureDir(relativeDir) {
   const full = path.join(uploadsDir, relativeDir);
   await mkdir(full, { recursive: true });
@@ -56,6 +259,21 @@ async function persistBuffer(relativeDir, filename, buffer) {
   const fullPath = path.join(targetDir, filename);
   await writeFile(fullPath, buffer);
   return `/uploads/${relativeDir}/${filename}`.replaceAll("\\", "/");
+}
+
+async function persistProctoringSnapshots(profileId, snapshots = []) {
+  const stored = [];
+  for (const [index, snapshot] of snapshots.slice(0, 5).entries()) {
+    if (!snapshot?.startsWith("data:image")) continue;
+    const buffer = Buffer.from(snapshot.split(",")[1] ?? "", "base64");
+    const relativePath = await persistBuffer(
+      `proctoring/${profileId}`,
+      `snapshot-${Date.now()}-${index}.jpg`,
+      buffer
+    );
+    stored.push(relativePath);
+  }
+  return stored;
 }
 
 app.post("/api/auth/register", async (req, res) => {
@@ -77,10 +295,11 @@ app.post("/api/auth/register", async (req, res) => {
     return res.status(409).json({ message: "Email already exists." });
   }
 
+  const role = adminEmailSet.has(email.toLowerCase()) ? "admin" : "candidate";
   const passwordHash = await bcrypt.hash(password, 10);
   const rows = await sql`
-    insert into profiles (email, password_hash, first_name, surname, id_number)
-    values (${email}, ${passwordHash}, ${first_name ?? null}, ${surname ?? null}, ${id_number ?? null})
+    insert into profiles (email, password_hash, first_name, surname, id_number, role)
+    values (${email}, ${passwordHash}, ${first_name ?? null}, ${surname ?? null}, ${id_number ?? null}, ${role})
     returning id, email, role
   `;
   const profile = rows[0];
@@ -95,7 +314,7 @@ app.post("/api/auth/register", async (req, res) => {
 
 app.post("/api/auth/login", async (req, res) => {
   const schema = z.object({
-    email: z.string().email(),
+    email: z.string().min(1),
     password: z.string().min(1),
   });
   const parsed = schema.safeParse(req.body);
@@ -103,27 +322,37 @@ app.post("/api/auth/login", async (req, res) => {
     return res.status(400).json({ message: "Invalid login payload." });
   }
   const { email, password } = parsed.data;
-  const rows = await sql`
-    select id, email, role, password_hash
-    from profiles
-    where email = ${email}
-    limit 1
-  `;
-  if (!rows.length) {
-    return res.status(401).json({ message: "Invalid credentials." });
+  const identifier = email.trim();
+  try {
+    const rows = await sql`
+      select id, email, role, password_hash
+      from profiles
+      where lower(email) = lower(${identifier}) or id_number = ${identifier}
+      limit 1
+    `;
+    if (!rows.length) {
+      return res.status(401).json({ message: "Invalid credentials." });
+    }
+    const profile = rows[0];
+    if (!profile.password_hash) {
+      return res.status(401).json({ message: "Invalid credentials." });
+    }
+    const valid = await bcrypt.compare(password, profile.password_hash);
+    if (!valid) {
+      return res.status(401).json({ message: "Invalid credentials." });
+    }
+    const token = jwt.sign({ sub: profile.id, role: profile.role, email: profile.email }, jwtSecret, {
+      expiresIn: "7d",
+    });
+    return res.json({
+      token,
+      user: { id: profile.id, email: profile.email },
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Login failed:", message);
+    return res.status(500).json({ message: "Login failed. Check the API server logs and database connection." });
   }
-  const profile = rows[0];
-  const valid = await bcrypt.compare(password, profile.password_hash);
-  if (!valid) {
-    return res.status(401).json({ message: "Invalid credentials." });
-  }
-  const token = jwt.sign({ sub: profile.id, role: profile.role, email: profile.email }, jwtSecret, {
-    expiresIn: "7d",
-  });
-  return res.json({
-    token,
-    user: { id: profile.id, email: profile.email },
-  });
 });
 
 app.post("/api/auth/logout", (_req, res) => {
@@ -132,16 +361,65 @@ app.post("/api/auth/logout", (_req, res) => {
 
 app.get("/api/profile/me", authMiddleware, async (req, res) => {
   const profileId = req.user.sub;
-  const rows = await sql`
-    select id, email, first_name, surname, id_number, licence_code, role, verification_status, eye_test_status, payment_status
-    from profiles
-    where id = ${profileId}
-    limit 1
-  `;
-  if (!rows.length) {
-    return res.status(404).json({ message: "Profile not found." });
+  try {
+    const rows = await sql`
+      select
+        p.id,
+        p.email,
+        p.first_name,
+        p.surname,
+        p.id_number,
+        p.licence_code,
+        p.role,
+        p.verification_status,
+        p.eye_test_status,
+        p.payment_status,
+        rej.reason as rejection_reason
+      from profiles
+      p
+      left join lateral (
+        select metadata->>'reason' as reason
+        from admin_audit_logs
+        where target_type = 'profile'
+          and target_id = ${profileId}
+          and action = 'verification_rejected'
+        order by created_at desc
+        limit 1
+      ) rej on true
+      where p.id = ${profileId}
+      limit 1
+    `;
+    if (!rows.length) {
+      return res.status(404).json({ message: "Profile not found." });
+    }
+    const learner = await getLearnerSchedule(profileId);
+    const schedule = learner?.schedule;
+    return res.json({
+      ...rows[0],
+      test_schedule: schedule
+        ? {
+            can_take_test: schedule.canTakeTest,
+            can_book_test: schedule.canBookTest,
+            test_block_reason: schedule.testBlockReason,
+            booking_block_reason: schedule.bookingBlockReason,
+            next_test_eligible_at: schedule.nextTestEligibleAt?.toISOString() ?? null,
+            next_booking_eligible_at: schedule.nextBookingEligibleAt?.toISOString() ?? null,
+            license_collection_from: schedule.licenseCollectionFrom?.toISOString() ?? null,
+            last_attempt_at: schedule.lastAttemptAt?.toISOString() ?? null,
+            last_attempt_passed: schedule.lastAttemptPassed,
+            last_attempt_failed: schedule.lastAttemptFailed,
+          }
+        : null,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Profile lookup failed:", message);
+    return res.status(500).json({
+      message: isMissingSchemaError(error)
+        ? "Database schema is out of date. Run npm run db:migrate and restart the API."
+        : "Could not load profile.",
+    });
   }
-  return res.json(rows[0]);
 });
 
 app.post(
@@ -205,6 +483,16 @@ app.post("/api/eye-test/submit", authMiddleware, upload.single("doctorLetter"), 
     return res.status(400).json({ message: "Invalid eye test status." });
   }
 
+  const [pre] = await sql`
+    select verification_status from profiles where id = ${profileId} limit 1
+  `;
+  if (!pre) {
+    return res.status(404).json({ message: "Profile not found." });
+  }
+  if (pre.verification_status === "rejected") {
+    return res.status(403).json({ message: "Cannot submit vision results for a rejected application." });
+  }
+
   let doctorPath = null;
   if (req.file) {
     doctorPath = await persistBuffer(
@@ -235,21 +523,73 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
   const schema = z.object({
     bookingDate: z.string().min(1),
     slotTime: z.string().min(1),
-    paid: z.boolean(),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ message: "Invalid booking payload." });
   }
   const profileId = req.user.sub;
-  const { bookingDate, slotTime, paid } = parsed.data;
+  const { bookingDate, slotTime } = parsed.data;
+
+  const [prow] = await sql`
+    select verification_status, eye_test_status from profiles where id = ${profileId} limit 1
+  `;
+  if (!prow) {
+    return res.status(404).json({ message: "Profile not found." });
+  }
+  if (prow.verification_status !== "approved") {
+    return res.status(403).json({ message: "NaTIS: online booking opens only after identity verification is approved." });
+  }
+  if (!["passed", "uploaded"].includes(prow.eye_test_status)) {
+    return res.status(403).json({ message: "NaTIS: complete the vision step before booking a test slot." });
+  }
+
+  const learner = await getLearnerSchedule(profileId);
+  if (!learner?.schedule.canBookTest) {
+    return res.status(403).json({
+      message: learner?.schedule.bookingBlockReason ?? "NaTIS: you cannot register for another test yet.",
+    });
+  }
+
+  const [latestPayment] = await sql`
+    select id, status
+    from payments
+    where profile_id = ${profileId}
+    order by created_at desc
+    limit 1
+  `;
+  if (!latestPayment || latestPayment.status !== "completed") {
+    return res.status(403).json({ message: "NaTIS: a completed payment is required before booking." });
+  }
 
   await sql`
     insert into bookings (profile_id, booking_date, slot_time, status)
     values (${profileId}, ${bookingDate}, ${slotTime}, 'confirmed')
   `;
 
-  if (paid) {
+  return res.status(201).json({ message: "Booking created." });
+});
+
+app.post("/api/payments/confirm", authMiddleware, async (req, res) => {
+  const schema = z.object({
+    provider: z.string().default("paypal"),
+    providerOrderId: z.string().min(1),
+    amount: z.number().positive().default(12),
+    status: z.enum(["completed", "failed"]).default("completed"),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ message: "Invalid payment confirmation payload." });
+  }
+
+  const profileId = req.user.sub;
+  const { provider, providerOrderId, amount, status } = parsed.data;
+  await sql`
+    insert into payments (profile_id, provider, provider_order_id, amount, status)
+    values (${profileId}, ${provider}, ${providerOrderId}, ${amount}, ${status})
+  `;
+
+  if (status === "completed") {
     await sql`
       update profiles
       set payment_status = 'paid', updated_at = now()
@@ -257,10 +597,14 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
     `;
   }
 
-  return res.status(201).json({ message: "Booking created." });
+  return res.status(201).json({ message: "Payment status recorded.", status });
 });
 
-app.get("/api/questions/active", authMiddleware, async (_req, res) => {
+app.get("/api/questions/active", authMiddleware, async (req, res) => {
+  const gate = await assertLearnerTestReady(req.user.sub);
+  if (!gate.ok) {
+    return res.status(gate.status).json({ message: gate.message });
+  }
   const rows = await sql`
     select question_text, options_json, correct_answer
     from question_bank
@@ -279,7 +623,7 @@ app.get("/api/questions/active", authMiddleware, async (_req, res) => {
           { id: "C", text: "Speed up" },
           { id: "D", text: "Pedestrians only" },
         ],
-        correctAnswer: "B",
+        correctAnswer: "b",
       },
     ]);
   }
@@ -288,12 +632,16 @@ app.get("/api/questions/active", authMiddleware, async (_req, res) => {
     rows.map((row) => ({
       question: row.question_text,
       options: row.options_json,
-      correctAnswer: row.correct_answer,
+      correctAnswer: String(row.correct_answer ?? "").toLowerCase(),
     }))
   );
 });
 
 app.post("/api/attempts/mark", authMiddleware, async (req, res) => {
+  const gate = await assertLearnerTestReady(req.user.sub);
+  if (!gate.ok) {
+    return res.status(gate.status).json({ message: gate.message });
+  }
   const schema = z.object({
     answers: z.record(z.string()),
     total: z.number().int().positive(),
@@ -315,7 +663,9 @@ app.post("/api/attempts/mark", authMiddleware, async (req, res) => {
   let score = 0;
   rows.forEach((row, index) => {
     const key = String(index);
-    if (answers[key] === row.correct_answer) {
+    const chosen = String(answers[key] ?? "").toLowerCase();
+    const expected = String(row.correct_answer ?? "").toLowerCase();
+    if (chosen === expected) {
       score += 1;
     }
   });
@@ -324,23 +674,65 @@ app.post("/api/attempts/mark", authMiddleware, async (req, res) => {
 });
 
 app.post("/api/attempts", authMiddleware, async (req, res) => {
+  const gate = await assertLearnerTestReady(req.user.sub);
+  if (!gate.ok) {
+    return res.status(gate.status).json({ message: gate.message });
+  }
   const schema = z.object({
     score: z.number().int().min(0),
     total: z.number().int().positive(),
     percentage: z.number(),
     passed: z.boolean(),
+    proctoring: z
+      .object({
+        tabSwitches: z.number().int().min(0).default(0),
+        faceMissingEvents: z.number().int().min(0).default(0),
+        snapshots: z.array(z.string()).max(5).optional(),
+      })
+      .optional(),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ message: "Invalid attempt payload." });
   }
   const profileId = req.user.sub;
-  const { score, total, percentage, passed } = parsed.data;
+  const { score, total, percentage, passed, proctoring } = parsed.data;
+  const snapshotPaths = await persistProctoringSnapshots(profileId, proctoring?.snapshots ?? []);
+  const suspicionScore = (proctoring?.tabSwitches ?? 0) * 10 + (proctoring?.faceMissingEvents ?? 0) * 15;
+  const proctoringSummary = {
+    tabSwitches: proctoring?.tabSwitches ?? 0,
+    faceMissingEvents: proctoring?.faceMissingEvents ?? 0,
+    snapshotCount: snapshotPaths.length,
+    snapshotPaths,
+    recordedAt: new Date().toISOString(),
+  };
+  const reviewFlagged = deriveReviewFlag(proctoringSummary, suspicionScore);
+  const attemptAt = new Date();
+  const nextTestEligibleAt = passed ? addDays(attemptAt, 21) : addDays(attemptAt, 91);
+  const nextBookingEligibleAt = passed ? null : addDays(attemptAt, 91);
+  const licenseCollectionFrom = passed ? addDays(attemptAt, 7) : null;
+
   await sql`
-    insert into attempts (profile_id, score, total, percentage, passed)
-    values (${profileId}, ${score}, ${total}, ${percentage}, ${passed})
+    insert into attempts (profile_id, score, total, percentage, passed, review_flagged, suspicion_score, proctoring_summary)
+    values (${profileId}, ${score}, ${total}, ${percentage}, ${passed}, ${reviewFlagged}, ${suspicionScore}, ${JSON.stringify(proctoringSummary)})
   `;
-  return res.status(201).json({ message: "Attempt saved." });
+  await sql`
+    update profiles
+    set
+      next_test_eligible_at = ${nextTestEligibleAt.toISOString()},
+      next_booking_eligible_at = ${nextBookingEligibleAt?.toISOString() ?? null},
+      license_collection_from = ${licenseCollectionFrom?.toISOString() ?? null},
+      updated_at = now()
+    where id = ${profileId}
+  `;
+  return res.status(201).json({
+    message: "Attempt saved.",
+    reviewFlagged,
+    suspicionScore,
+    nextTestEligibleAt: nextTestEligibleAt.toISOString(),
+    nextBookingEligibleAt: nextBookingEligibleAt?.toISOString() ?? null,
+    licenseCollectionFrom: licenseCollectionFrom?.toISOString() ?? null,
+  });
 });
 
 app.post("/api/results/document", authMiddleware, async (req, res) => {
@@ -359,7 +751,147 @@ app.post("/api/results/document", authMiddleware, async (req, res) => {
   return res.json({ message: "Result document generated.", path: relativePath });
 });
 
-app.listen(port, () => {
-  console.log(`Neon API listening on http://localhost:${port}`);
+app.get("/api/admin/stats", authMiddleware, adminMiddleware, async (_req, res) => {
+  const [p] = await sql`select count(*)::int as c from profiles`;
+  const [pend] = await sql`select count(*)::int as c from profiles where verification_status = 'pending' and role = 'candidate'`;
+  const [bk] = await sql`select count(*)::int as c from bookings`;
+  const [att] = await sql`select count(*)::int as c from attempts`;
+  const [passed] = await sql`select count(*)::int as c from attempts where passed = true`;
+  const [qcount] = await sql`select count(*)::int as c from question_bank where is_active = true`;
+  return res.json({
+    totalProfiles: p.c,
+    pendingVerification: pend.c,
+    totalBookings: bk.c,
+    totalAttempts: att.c,
+    passedAttempts: passed.c,
+    activeQuestions: qcount.c,
+  });
 });
+
+app.get("/api/admin/verification-queue", authMiddleware, adminMiddleware, async (_req, res) => {
+  const rows = await sql`
+    select
+      p.id,
+      p.email,
+      p.first_name,
+      p.surname,
+      p.id_number,
+      p.verification_status,
+      p.created_at,
+      vd.id_copy_path,
+      vd.passport_copy_path,
+      vd.face_capture_path,
+      vd.doctor_letter_path,
+      vd.created_at as documents_updated_at
+    from profiles p
+    left join lateral (
+      select id_copy_path, passport_copy_path, face_capture_path, doctor_letter_path, created_at
+      from verification_documents
+      where profile_id = p.id
+      order by created_at desc
+      limit 1
+    ) vd on true
+    where p.role = 'candidate' and p.verification_status = 'pending'
+    order by p.created_at asc
+    limit 100
+  `;
+  return res.json(rows);
+});
+
+app.get("/api/admin/bookings", authMiddleware, adminMiddleware, async (_req, res) => {
+  const rows = await sql`
+    select b.id, b.booking_date, b.slot_time, b.status, b.created_at, p.email, p.first_name, p.surname
+    from bookings b
+    join profiles p on p.id = b.profile_id
+    order by b.created_at desc
+    limit 100
+  `;
+  return res.json(rows);
+});
+
+app.get("/api/admin/attempts", authMiddleware, adminMiddleware, async (_req, res) => {
+  const rows = await sql`
+    select a.id, a.score, a.total, a.percentage, a.passed, a.review_flagged, a.suspicion_score, a.created_at, p.email
+    from attempts a
+    join profiles p on p.id = a.profile_id
+    order by a.created_at desc
+    limit 100
+  `;
+  return res.json(rows);
+});
+
+app.get("/api/admin/audit", authMiddleware, adminMiddleware, async (_req, res) => {
+  const rows = await sql`
+    select l.id, l.action, l.target_type, l.target_id, l.metadata, l.created_at, p.email as admin_email
+    from admin_audit_logs l
+    left join profiles p on p.id = l.admin_id
+    order by l.created_at desc
+    limit 100
+  `;
+  return res.json(rows);
+});
+
+app.post("/api/admin/verification/:profileId", authMiddleware, adminMiddleware, async (req, res) => {
+  const schema = z.object({
+    decision: z.enum(["approved", "rejected"]),
+    reason: z.string().optional(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ message: "Body must include decision: approved | rejected" });
+  }
+  const { profileId } = req.params;
+  const { decision, reason } = parsed.data;
+  if (decision === "rejected" && !reason?.trim()) {
+    return res.status(400).json({ message: "A rejection reason is required." });
+  }
+  const updated = await sql`
+    update profiles
+    set verification_status = ${decision}, updated_at = now()
+    where id = ${profileId} and role = 'candidate'
+    returning id, email, verification_status
+  `;
+  if (!updated.length) {
+    return res.status(404).json({ message: "Candidate profile not found or not updatable." });
+  }
+  const auditMeta = JSON.stringify({ decision, reason: reason?.trim() ?? null, at: new Date().toISOString() });
+  await sql`
+    insert into admin_audit_logs (admin_id, action, target_type, target_id, metadata)
+    values (${req.user.sub}, ${`verification_${decision}`}, 'profile', ${profileId}, ${auditMeta})
+  `;
+  return res.json({ profile: updated[0] });
+});
+
+const server = createServer(app);
+
+const host = process.env.HOST ?? "0.0.0.0";
+
+server.listen(port, host, () => {
+  console.log(`API listening on http://${host}:${port}`);
+  console.log(`Health check: http://localhost:${port}/api/health`);
+  console.log("Leave this terminal open while you use the app (Ctrl+C to stop).");
+});
+
+server.on("error", (err) => {
+  if (err.code === "EADDRINUSE") {
+    console.error(`\nPort ${port} is already in use.`);
+    console.error(`The API may already be running — try http://localhost:${port}/api/health in your browser.`);
+    console.error("If health works, you do not need to start the API again.");
+    console.error(
+      "Otherwise stop the process on port 3001, then run npm run dev:api again.\n"
+    );
+    process.exit(1);
+  }
+  console.error(err);
+  process.exit(1);
+});
+
+process.on("SIGINT", () => {
+  server.close(() => process.exit(0));
+});
+
+// Some Windows terminals close stdin immediately; keep the process attached when interactive.
+if (process.stdin.isTTY) {
+  process.stdin.resume();
+}
 

@@ -1,0 +1,21 @@
+# Deploy the API to Render (https://render.com) — free tier works for assignments.
+# After deploy, set FRONTEND_ORIGIN to your Cloudflare Pages URL.
+services:
+  - type: web
+    name: natis-drive-learn-api
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm run start:api
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: "20"
+      - key: DATABASE_URL
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: FRONTEND_ORIGIN
+        sync: false
+      - key: ADMIN_EMAILS
+        sync: false

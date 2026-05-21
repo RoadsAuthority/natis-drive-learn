@@ -9,7 +9,7 @@ export default function VerifiedOnlyRoute({ children }: Props) {
   const { canTakeTest } = useEligibility();
 
   if (!canTakeTest) {
-    return <Navigate to="/profile-verification" replace />;
+    return <Navigate to="/portal" replace />;
   }
 
   return children;

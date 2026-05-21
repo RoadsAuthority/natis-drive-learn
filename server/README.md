@@ -48,3 +48,44 @@ Use your preferred storage provider (S3, Cloudinary, etc.) and persist returned 
 - `verification_documents.face_capture_path`
 - `verification_documents.doctor_letter_path`
 
+## Study PDFs (RoadsAuth)
+
+Place official PDFs under the repo folder `RoadsAuth/` (e.g. learner book and NATIS test papers).
+
+- Static files: `GET /study-materials/<filename>` (URL-encoded names with spaces are supported).
+- JSON index for the frontend: `GET /api/study-materials/list`
+
+The app route `/study` lists these files when `VITE_API_BASE_URL` points at this API.
+
+## Online test question bank (not from PDF)
+
+PDFs are not parsed into database rows automatically. To load questions into Neon:
+
+1. Edit `data/question-bank.json` — array of objects:
+
+   - `question` (string)
+   - `options` (array of `{ "id": "a", "text": "..." }` — ids should match what the UI submits, usually `a`–`d`)
+   - `correctAnswer` (string, same as one option `id`)
+
+2. Run (from repo root, with `DATABASE_URL` in `server/.env`):
+
+   - `npm run seed:questions` — append rows
+   - `npm run seed:questions -- --replace` — delete all rows in `question_bank`, then insert (full reload)
+
+The learner test reads active rows from `question_bank` via `GET /api/questions/active`.
+
+## Go-live checklist (next day)
+
+1. **Neon** — From repo root, with `DATABASE_URL` set in `server/.env`: run `npm run db:migrate` (applies `neon/migrations/20260426_full_v1.sql`). Or paste that file into the Neon SQL Editor and run it once.
+2. **Secrets** — Set `DATABASE_URL`, `JWT_SECRET`, and optional `ADMIN_EMAILS` in `server/.env` (never commit `server/.env`).
+3. **Question bank** — `npm run generate:questions` then `npm run seed:questions -- --replace` (loads 70 rows from `data/question-bank.json`).
+4. **PDFs** — Keep official papers under `RoadsAuth/`; API serves them at `/study-materials/...`.
+5. **Frontend** — Root `.env`: `VITE_API_BASE_URL` = your API origin (HTTPS in production).
+6. **Process** — Candidate: portal → documents → **verifier approves** → vision → book & pay → theory test. Verifier: register with an `ADMIN_EMAILS` address, or add your email to `ADMIN_EMAILS` before registering that account.
+7. **Run** — Terminal A: `npm run dev:api` · Terminal B: `npm run dev`.
+
+## Health checks
+
+- API + DB quick probe: `GET /api/health`
+- Study file index probe: `GET /api/study-materials/list`
+

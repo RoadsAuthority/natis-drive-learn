@@ -10,7 +10,17 @@ type TestResults = {
   total: number;
   percentage: string;
   passed: boolean;
+  reviewFlagged?: boolean;
+  suspicionScore?: number;
+  nextTestEligibleAt?: string | null;
+  nextBookingEligibleAt?: string | null;
+  licenseCollectionFrom?: string | null;
 };
+
+function formatDate(value?: string | null) {
+  if (!value) return null;
+  return new Date(value).toLocaleDateString();
+}
 
 const Results = () => {
   const navigate = useNavigate();
@@ -30,7 +40,7 @@ const Results = () => {
   const downloadResult = async () => {
     await requestResultDocument(results);
     const documentText = [
-      "NaTIS Learner Test Result",
+      "Learner Theory Test Result",
       `Date: ${new Date().toLocaleDateString()}`,
       `Score: ${results.score}/${results.total}`,
       `Percentage: ${results.percentage}%`,
@@ -60,18 +70,18 @@ const Results = () => {
               </div>
             )}
             <h1 className="text-4xl font-bold mb-2">
-              {results.passed ? "Congratulations!" : "Test Not Passed"}
+              {results.passed ? "Congratulations!" : "Test not passed"}
             </h1>
             <p className="text-lg text-muted-foreground">
               {results.passed
-                ? "You have successfully passed the learner's test!"
-                : "Unfortunately, you did not achieve the passing score this time."}
+                ? "You have successfully passed the learner theory test."
+                : "You did not reach the 80% pass mark this time."}
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-4 mb-8">
             <Card className="p-6 bg-muted">
-              <p className="text-sm text-muted-foreground mb-1">Your Score</p>
+              <p className="text-sm text-muted-foreground mb-1">Your score</p>
               <p className="text-3xl font-bold text-foreground">
                 {results.score}/{results.total}
               </p>
@@ -83,7 +93,7 @@ const Results = () => {
               </p>
             </Card>
             <Card className="p-6 bg-muted">
-              <p className="text-sm text-muted-foreground mb-1">Pass Mark</p>
+              <p className="text-sm text-muted-foreground mb-1">Pass mark</p>
               <p className="text-3xl font-bold text-foreground">80%</p>
             </Card>
           </div>
@@ -92,34 +102,50 @@ const Results = () => {
             <div className="space-y-4">
               <div className="bg-success/10 border border-success/20 rounded-lg p-4 mb-6">
                 <p className="text-success font-medium">
-                  You may now proceed to book your practical driving test.
-                  Your certificate is available for download below.
+                  Your result is available for download below.
                 </p>
+                {results.licenseCollectionFrom ? (
+                  <p className="text-sm text-success mt-2">
+                    You may collect your learner&apos;s licence from {formatDate(results.licenseCollectionFrom)}.
+                  </p>
+                ) : null}
               </div>
+              {results.reviewFlagged ? (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm">
+                  This session was flagged for verifier review because of monitoring signals. Your result is still
+                  recorded.
+                </div>
+              ) : null}
               <Button size="lg" className="w-full md:w-auto" onClick={() => void downloadResult()}>
                 <Download className="mr-2 h-4 w-4" />
-                Download Certificate
+                Download certificate
               </Button>
             </div>
           ) : (
-            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 mb-6">
-              <p className="text-destructive font-medium">
-                You need to score at least 80% to pass. Please review the road
-                rules and try again.
-              </p>
+            <div className="space-y-4">
+              <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 mb-6">
+                <p className="text-destructive font-medium">
+                  You may register for another test after the 13-week waiting period.
+                </p>
+                {results.nextBookingEligibleAt ? (
+                  <p className="text-sm text-destructive mt-2">
+                    Earliest re-registration date: {formatDate(results.nextBookingEligibleAt)}.
+                  </p>
+                ) : null}
+              </div>
+              {results.reviewFlagged ? (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm">
+                  Monitoring signals were recorded for verifier review.
+                </div>
+              ) : null}
             </div>
           )}
 
           <div className="flex gap-4 justify-center mt-8">
-            <Button variant="outline" onClick={() => navigate("/")}>
+            <Button variant="outline" onClick={() => navigate("/portal")}>
               <Home className="mr-2 h-4 w-4" />
-              Return Home
+              Return to portal
             </Button>
-            {!results.passed && (
-              <Button onClick={() => navigate("/instructions")}>
-                Retake Test
-              </Button>
-            )}
           </div>
         </Card>
 

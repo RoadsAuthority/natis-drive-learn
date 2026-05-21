@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -8,9 +8,11 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { LogIn, UserPlus, ArrowLeft } from "lucide-react";
 import { signIn, signUp } from "@/lib/auth";
+import { useAuthContext } from "@/components/auth/AuthProvider";
 
 const Login = () => {
   const navigate = useNavigate();
+  const { refresh } = useAuthContext();
   const [loginData, setLoginData] = useState({ email: "", password: "" });
   const [registerData, setRegisterData] = useState({
     firstName: "",
@@ -32,8 +34,9 @@ const Login = () => {
         toast.error(error.message);
         return;
       }
+      const profile = await refresh();
       toast.success("Login successful!");
-      navigate("/profile-verification");
+      navigate(profile?.role === "admin" ? "/admin" : "/portal");
     } catch (error) {
       toast.error((error as Error).message);
     }
@@ -55,8 +58,9 @@ const Login = () => {
         toast.error(error.message);
         return;
       }
+      const profile = await refresh();
       toast.success("Registration successful! Check email for confirmation if required.");
-      navigate("/profile-verification");
+      navigate(profile?.role === "admin" ? "/admin" : "/portal");
     } catch (error) {
       toast.error((error as Error).message);
     }
@@ -76,7 +80,7 @@ const Login = () => {
 
         <Card className="p-8 shadow-lg">
           <div className="text-center mb-6">
-            <h1 className="text-3xl font-bold text-foreground">NaTIS Portal</h1>
+            <h1 className="text-3xl font-bold text-foreground">Learner Licence Portal</h1>
             <p className="text-muted-foreground mt-2">Access your learner's test</p>
           </div>
 

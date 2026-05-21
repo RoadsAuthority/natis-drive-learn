@@ -7,16 +7,20 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { createBooking } from "@/lib/natisApi";
+import { confirmPayment, createBooking } from "@/lib/natisApi";
+import { useAuthContext } from "@/components/auth/AuthProvider";
 
 const slots = ["08:00", "10:00", "12:00", "14:00", "16:00"];
 
 export default function Booking() {
   const navigate = useNavigate();
+  const { refresh } = useAuthContext();
   const [bookingDate, setBookingDate] = useState("");
   const [slot, setSlot] = useState("");
   const [paid, setPaid] = useState(false);
   const paypalClientId = import.meta.env.VITE_PAYPAL_CLIENT_ID;
+  const allowSandboxPayment =
+    import.meta.env.DEV || import.meta.env.VITE_ALLOW_SANDBOX_PAYMENT === "true";
 
   const persistBooking = async () => {
     if (!bookingDate || !slot) {
@@ -29,6 +33,7 @@ export default function Booking() {
     }
     await createBooking(bookingDate, slot, paid);
     localStorage.setItem("paymentStatus", "paid");
+    await refresh();
     toast.success("Booking confirmed.");
     navigate("/instructions");
   };
@@ -66,21 +71,35 @@ export default function Booking() {
                     })
                   }
                   onApprove={async (_data, actions) => {
-                    await actions.order?.capture();
+                    const captured = await actions.order?.capture();
+                    const orderId = captured?.id ?? _data.orderID ?? `paypal-${Date.now()}`;
+                    await confirmPayment(orderId, 12);
                     setPaid(true);
-                    toast.success("Payment captured successfully.");
+                    toast.success("Payment captured and recorded.");
                   }}
                 />
               </PayPalScriptProvider>
-            ) : (
+            ) : allowSandboxPayment ? (
               <div className="space-y-2">
                 <p className="text-sm text-muted-foreground">
-                  PayPal client id is not configured. Set <code>VITE_PAYPAL_CLIENT_ID</code> to enable live checkout.
+                  Demo mode: record a test payment without PayPal (for assignments and staging only).
                 </p>
-                <Button type="button" variant="outline" onClick={() => setPaid(true)}>
-                  Mark as Paid (Sandbox fallback)
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={async () => {
+                    await confirmPayment(`demo-payment-${Date.now()}`, 12);
+                    setPaid(true);
+                    toast.success("Demo payment recorded.");
+                  }}
+                >
+                  Record demo payment
                 </Button>
               </div>
+            ) : (
+              <p className="text-sm text-muted-foreground">
+                Online payment is not configured yet. Ask your administrator to enable PayPal checkout.
+              </p>
             )}
           </Card>
 
