@@ -430,49 +430,64 @@ app.post(
     { name: "passportCopy", maxCount: 1 },
   ]),
   async (req, res) => {
-    const profileId = req.user.sub;
-    const { firstName, surname, idNumber, licenceCode, faceCaptureBase64 } = req.body;
+    try {
+      const profileId = req.user.sub;
+      const { firstName, surname, idNumber, licenceCode, faceCaptureBase64 } = req.body;
 
-    const files = req.files ?? {};
-    const idCopy = files.idCopy?.[0] ?? null;
-    const passportCopy = files.passportCopy?.[0] ?? null;
+      const files = req.files ?? {};
+      const idCopy = files.idCopy?.[0] ?? null;
+      const passportCopy = files.passportCopy?.[0] ?? null;
 
-    let idPath = null;
-    let passportPath = null;
-    let facePath = null;
+      if (!idCopy && !passportCopy) {
+        return res.status(400).json({ message: "Upload an ID copy or passport." });
+      }
+      if (!faceCaptureBase64?.startsWith("data:image")) {
+        return res.status(400).json({ message: "Capture or upload a face photo before submitting." });
+      }
 
-    if (idCopy) {
-      idPath = await persistBuffer(`verification/${profileId}`, `id-${Date.now()}-${idCopy.originalname}`, idCopy.buffer);
-    }
-    if (passportCopy) {
-      passportPath = await persistBuffer(
-        `verification/${profileId}`,
-        `passport-${Date.now()}-${passportCopy.originalname}`,
-        passportCopy.buffer
-      );
-    }
-    if (faceCaptureBase64?.startsWith("data:image")) {
+      let idPath = null;
+      let passportPath = null;
+      let facePath = null;
+
+      if (idCopy) {
+        idPath = await persistBuffer(`verification/${profileId}`, `id-${Date.now()}-${idCopy.originalname}`, idCopy.buffer);
+      }
+      if (passportCopy) {
+        passportPath = await persistBuffer(
+          `verification/${profileId}`,
+          `passport-${Date.now()}-${passportCopy.originalname}`,
+          passportCopy.buffer
+        );
+      }
       const buffer = Buffer.from(faceCaptureBase64.split(",")[1] ?? "", "base64");
       facePath = await persistBuffer(`verification/${profileId}`, `face-${Date.now()}.png`, buffer);
+
+      await sql`
+        update profiles
+        set first_name = ${firstName ?? null},
+            surname = ${surname ?? null},
+            id_number = ${idNumber ?? null},
+            licence_code = ${licenceCode ?? null},
+            verification_status = 'pending',
+            updated_at = now()
+        where id = ${profileId}
+      `;
+
+      await sql`
+        insert into verification_documents (profile_id, id_copy_path, passport_copy_path, face_capture_path, review_status)
+        values (${profileId}, ${idPath}, ${passportPath}, ${facePath}, 'pending')
+      `;
+
+      return res.status(201).json({ message: "Verification submitted." });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      console.error("Verification submit failed:", message);
+      return res.status(500).json({
+        message: isMissingSchemaError(error)
+          ? "Database schema is out of date. Run npm run db:migrate and restart the API."
+          : "Could not save verification documents. Try smaller image files and submit again.",
+      });
     }
-
-    await sql`
-      update profiles
-      set first_name = ${firstName ?? null},
-          surname = ${surname ?? null},
-          id_number = ${idNumber ?? null},
-          licence_code = ${licenceCode ?? null},
-          verification_status = 'pending',
-          updated_at = now()
-      where id = ${profileId}
-    `;
-
-    await sql`
-      insert into verification_documents (profile_id, id_copy_path, passport_copy_path, face_capture_path, review_status)
-      values (${profileId}, ${idPath}, ${passportPath}, ${facePath}, 'pending')
-    `;
-
-    return res.status(201).json({ message: "Verification submitted." });
   }
 );
 
@@ -810,14 +825,24 @@ app.get("/api/admin/bookings", authMiddleware, adminMiddleware, async (_req, res
 });
 
 app.get("/api/admin/attempts", authMiddleware, adminMiddleware, async (_req, res) => {
-  const rows = await sql`
-    select a.id, a.score, a.total, a.percentage, a.passed, a.review_flagged, a.suspicion_score, a.created_at, p.email
-    from attempts a
-    join profiles p on p.id = a.profile_id
-    order by a.created_at desc
-    limit 100
-  `;
-  return res.json(rows);
+  try {
+    const rows = await sql`
+      select a.id, a.score, a.total, a.percentage, a.passed, a.review_flagged, a.suspicion_score, a.created_at, p.email
+      from attempts a
+      join profiles p on p.id = a.profile_id
+      order by a.created_at desc
+      limit 100
+    `;
+    return res.json(rows);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Admin attempts failed:", message);
+    return res.status(500).json({
+      message: isMissingSchemaError(error)
+        ? "Database schema is out of date. Run npm run db:migrate and restart the API."
+        : "Could not load attempts.",
+    });
+  }
 });
 
 app.get("/api/admin/audit", authMiddleware, adminMiddleware, async (_req, res) => {

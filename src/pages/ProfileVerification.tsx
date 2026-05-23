@@ -23,6 +23,7 @@ export default function ProfileVerification() {
   const [passportCopy, setPassportCopy] = useState<File | null>(null);
   const [faceCapture, setFaceCapture] = useState<string>("");
   const [capturing, setCapturing] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
   const [cameraIssue, setCameraIssue] = useState<string | null>(null);
 
   const isSecureCameraContext =
@@ -117,21 +118,26 @@ export default function ProfileVerification() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    if (!formData.firstName.trim() || !formData.surname.trim() || !formData.idNumber.trim()) {
+      toast.error("Fill in first name, surname, and ID number.");
+      return;
+    }
     if (!idCopy && !passportCopy) {
       toast.error("Upload an ID copy or passport.");
       return;
     }
     if (!faceCapture) {
-      toast.error("Capture your face photo before submitting.");
+      toast.error("Capture or upload your face photo before submitting.");
       return;
     }
 
+    setSubmitting(true);
     try {
       const payload = new FormData();
-      payload.append("firstName", formData.firstName);
-      payload.append("surname", formData.surname);
-      payload.append("idNumber", formData.idNumber);
-      payload.append("licenceCode", formData.licenceCode);
+      payload.append("firstName", formData.firstName.trim());
+      payload.append("surname", formData.surname.trim());
+      payload.append("idNumber", formData.idNumber.trim());
+      payload.append("licenceCode", formData.licenceCode.trim());
       if (idCopy) payload.append("idCopy", idCopy);
       if (passportCopy) payload.append("passportCopy", passportCopy);
       payload.append("faceCaptureBase64", faceCapture);
@@ -140,8 +146,10 @@ export default function ProfileVerification() {
       await refresh();
       toast.success("Verification submitted. Admin review is required.");
       navigate("/portal");
-    } catch {
-      toast.error("Failed to submit verification.");
+    } catch (error) {
+      toast.error((error as Error).message || "Failed to submit verification.");
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -258,9 +266,9 @@ export default function ProfileVerification() {
               ) : null}
             </Card>
 
-            <Button type="submit" className="w-full">
+            <Button type="submit" className="w-full" disabled={submitting}>
               <Upload className="mr-2 h-4 w-4" />
-              Submit for Admin Verification
+              {submitting ? "Submitting..." : "Submit for Admin Verification"}
             </Button>
           </form>
         </Card>

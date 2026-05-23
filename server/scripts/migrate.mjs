@@ -47,7 +47,7 @@ for (const migrationFile of migrationFiles) {
   let n = 0;
   for (const statement of statements) {
     const text = statement.endsWith(";") ? statement : `${statement};`;
-    await sql.unsafe(text);
+    await sql.query(text);
     n += 1;
     totalStatements += 1;
     const preview = statement.split("\n")[0]?.slice(0, 60) ?? "";

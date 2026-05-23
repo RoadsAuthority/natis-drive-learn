@@ -88,5 +88,7 @@ Root `.env`: `VITE_API_BASE_URL=http://localhost:3001`
 |-------|-----|
 | API terminal returns to prompt immediately | Port 3001 in use — open `/api/health` or run `.\scripts\start-api.ps1` |
 | Login works but portal empty | Run `npm run db:migrate`; restart API |
+| Admin attempts 500 | Run `npm run db:migrate` (applies proctoring columns). If it still fails, run `node server/scripts/fix-schema.mjs` |
+| Verification submit fails | Upload ID + face photo; use smaller images; check browser toast for the API error |
 | Camera blocked | Use HTTPS (Vercel) or localhost |
 | CORS errors | `FRONTEND_ORIGIN` must match the exact Vercel URL (e.g. `https://your-app.vercel.app`) |
