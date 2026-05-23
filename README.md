@@ -52,7 +52,7 @@ npm run dev:all
 
 ## Cloud deployment
 
-See **[DEPLOY.md](./DEPLOY.md)** — Cloudflare Pages + Render + Neon.
+See **[DEPLOY.md](./DEPLOY.md)** — Vercel + Render + Neon.
 
 ## Scripts
 

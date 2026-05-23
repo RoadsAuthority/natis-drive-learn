@@ -1,6 +1,6 @@
 # Deploy to the cloud (assignment / demo)
 
-Stack: **Cloudflare Pages** (website) + **Render** (API) + **Neon** (database).
+Stack: **Vercel** (website) + **Render** (API) + **Neon** (database).
 
 ## 1. Database (Neon)
 
@@ -28,7 +28,7 @@ npm run seed:questions -- --replace
 |----------|---------|
 | `DATABASE_URL` | `postgresql://...` (quoted if it contains `&`) |
 | `JWT_SECRET` | long random string |
-| `FRONTEND_ORIGIN` | `https://your-app.pages.dev` (set after step 3) |
+| `FRONTEND_ORIGIN` | `https://your-app.vercel.app` (set after step 3) |
 | `ADMIN_EMAILS` | `you@school.edu` |
 | `PORT` | leave empty (Render sets it) |
 
@@ -38,12 +38,13 @@ npm run seed:questions -- --replace
 
 Verify: open `https://YOUR-API.onrender.com/api/health` → `"ok": true`.
 
-## 3. Frontend (Cloudflare Pages)
+## 3. Frontend (Vercel)
 
-1. [Cloudflare Dashboard](https://dash.cloudflare.com) → **Workers & Pages** → **Create** → **Pages** → connect GitHub.
-2. Build settings:
+1. [Vercel](https://vercel.com) → **Add New** → **Project** → import your GitHub repo.
+2. Build settings (Vercel usually auto-detects Vite):
+   - **Framework preset:** Vite
    - **Build command:** `npm run build`
-   - **Build output:** `dist`
+   - **Output directory:** `dist`
 3. Environment variables (Production):
 
 | Variable | Value |
@@ -52,13 +53,13 @@ Verify: open `https://YOUR-API.onrender.com/api/health` → `"ok": true`.
 | `VITE_PAYPAL_CLIENT_ID` | optional PayPal sandbox/live client id |
 | `VITE_ALLOW_SANDBOX_PAYMENT` | `true` for assignment demos without PayPal |
 
-4. Deploy. Copy the Pages URL (e.g. `https://natis-drive-learn.pages.dev`).
+4. Deploy. Copy the Vercel URL (e.g. `https://natis-drive-learn.vercel.app`).
 
-5. Go back to Render → set `FRONTEND_ORIGIN` to that Pages URL → redeploy API.
+5. Go back to Render → set `FRONTEND_ORIGIN` to that exact Vercel URL (no trailing slash) → redeploy API.
 
-6. Custom domain (optional): Pages → **Custom domains**.
+6. Custom domain (optional): Vercel project → **Settings** → **Domains**.
 
-SPA routing is handled by `public/_redirects`.
+SPA routing is handled by `vercel.json` (rewrites all routes to `index.html`).
 
 ## 4. First login
 
@@ -87,5 +88,5 @@ Root `.env`: `VITE_API_BASE_URL=http://localhost:3001`
 |-------|-----|
 | API terminal returns to prompt immediately | Port 3001 in use — open `/api/health` or run `.\scripts\start-api.ps1` |
 | Login works but portal empty | Run `npm run db:migrate`; restart API |
-| Camera blocked | Use HTTPS (Pages) or localhost |
-| CORS errors | `FRONTEND_ORIGIN` must match the exact Pages URL |
+| Camera blocked | Use HTTPS (Vercel) or localhost |
+| CORS errors | `FRONTEND_ORIGIN` must match the exact Vercel URL (e.g. `https://your-app.vercel.app`) |

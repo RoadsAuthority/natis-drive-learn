@@ -1,5 +1,5 @@
 # Deploy the API to Render (https://render.com) — free tier works for assignments.
-# After deploy, set FRONTEND_ORIGIN to your Cloudflare Pages URL.
+# After deploy, set FRONTEND_ORIGIN to your Vercel URL.
 services:
   - type: web
     name: natis-drive-learn-api
