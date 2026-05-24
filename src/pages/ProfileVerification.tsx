@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Camera, Upload } from "lucide-react";
 import { toast } from "sonner";
@@ -8,11 +8,12 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { submitProfileVerification } from "@/lib/natisApi";
 import { useAuthContext } from "@/components/auth/AuthProvider";
+import { useFaceCamera } from "@/hooks/useFaceCamera";
 
 export default function ProfileVerification() {
   const navigate = useNavigate();
   const { refresh } = useAuthContext();
-  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const { videoRef, capturing, ready, error: cameraError, start, capture } = useFaceCamera();
   const [formData, setFormData] = useState({
     firstName: "",
     surname: "",
@@ -22,63 +23,7 @@ export default function ProfileVerification() {
   const [idCopy, setIdCopy] = useState<File | null>(null);
   const [passportCopy, setPassportCopy] = useState<File | null>(null);
   const [faceCapture, setFaceCapture] = useState<string>("");
-  const [capturing, setCapturing] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [cameraIssue, setCameraIssue] = useState<string | null>(null);
-
-  const isSecureCameraContext =
-    typeof window !== "undefined" &&
-    (window.isSecureContext || /^localhost$|^127\.0\.0\.1$/i.test(window.location.hostname));
-
-  const cameraErrorMessage = (err: unknown) => {
-    const name = err instanceof DOMException ? err.name : "";
-    if (name === "NotAllowedError" || name === "PermissionDeniedError") {
-      return "Camera is blocked. Click the lock or site icon in your browser’s address bar, allow Camera for this site, then try again—or upload a face photo below.";
-    }
-    if (name === "NotFoundError" || name === "DevicesNotFoundError") {
-      return "No camera was found. Connect a camera or upload a face photo below.";
-    }
-    if (name === "NotReadableError" || name === "TrackStartError") {
-      return "The camera is in use by another app. Close other apps using the camera or upload a photo below.";
-    }
-    if (typeof window !== "undefined" && !window.isSecureContext && !/^localhost$|^127\.0\.0\.1$/i.test(window.location.hostname)) {
-      return "The camera only works on HTTPS (or localhost). Open the site over HTTPS, or upload a face photo below.";
-    }
-    if (!navigator.mediaDevices?.getUserMedia) {
-      return "This browser does not support camera access here. Upload a face photo below.";
-    }
-    return "Could not use the camera. Upload a face photo below instead.";
-  };
-
-  const startCamera = async () => {
-    if (!navigator.mediaDevices?.getUserMedia) {
-      const message = cameraErrorMessage(null);
-      setCameraIssue(message);
-      toast.error(message);
-      return;
-    }
-    if (!isSecureCameraContext) {
-      const message = cameraErrorMessage(new DOMException("Insecure context", "NotAllowedError"));
-      setCameraIssue(message);
-      toast.error(message);
-      return;
-    }
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: "user" },
-        audio: false,
-      });
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        setCapturing(true);
-        setCameraIssue(null);
-      }
-    } catch (err) {
-      const message = cameraErrorMessage(err);
-      setCameraIssue(message);
-      toast.error(message);
-    }
-  };
 
   const onFacePhotoFile = (file: File | null) => {
     if (!file) return;
@@ -91,29 +36,27 @@ export default function ProfileVerification() {
       const result = reader.result;
       if (typeof result === "string") {
         setFaceCapture(result);
-        const stream = videoRef.current?.srcObject as MediaStream | null;
-        stream?.getTracks().forEach((track) => track.stop());
-        setCapturing(false);
-        if (videoRef.current) videoRef.current.srcObject = null;
-        toast.success("Face photo ready. You can submit when the rest of the form is complete.");
+        toast.success("Face photo ready.");
       }
     };
     reader.readAsDataURL(file);
   };
 
-  const captureFace = () => {
-    const video = videoRef.current;
-    if (!video) return;
-    const canvas = document.createElement("canvas");
-    canvas.width = video.videoWidth || 320;
-    canvas.height = video.videoHeight || 240;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-    setFaceCapture(canvas.toDataURL("image/png"));
-    const stream = video.srcObject as MediaStream | null;
-    stream?.getTracks().forEach((track) => track.stop());
-    setCapturing(false);
+  const handleStartCamera = async () => {
+    const message = await start();
+    if (message) {
+      toast.error(message);
+    }
+  };
+
+  const handleCaptureFace = () => {
+    const frame = capture();
+    if (!frame) {
+      toast.error(ready ? "Could not capture photo. Try again." : "Wait for the camera preview to appear.");
+      return;
+    }
+    setFaceCapture(frame);
+    toast.success("Face photo captured.");
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
@@ -199,13 +142,14 @@ export default function ProfileVerification() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label htmlFor="idCopy">ID Copy</Label>
-                <Input id="idCopy" type="file" onChange={(e) => setIdCopy(e.target.files?.[0] ?? null)} />
+                <Input id="idCopy" type="file" accept="image/*,.pdf" onChange={(e) => setIdCopy(e.target.files?.[0] ?? null)} />
               </div>
               <div>
                 <Label htmlFor="passportCopy">Passport Copy (optional)</Label>
                 <Input
                   id="passportCopy"
                   type="file"
+                  accept="image/*,.pdf"
                   onChange={(e) => setPassportCopy(e.target.files?.[0] ?? null)}
                 />
               </div>
@@ -216,33 +160,19 @@ export default function ProfileVerification() {
                 <h2 className="font-semibold">Face photo</h2>
                 <div className="flex flex-wrap gap-2">
                   {!capturing ? (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={startCamera}
-                      disabled={!isSecureCameraContext}
-                    >
+                    <Button type="button" variant="outline" onClick={() => void handleStartCamera()}>
                       <Camera className="mr-2 h-4 w-4" /> Use camera
                     </Button>
                   ) : (
-                    <Button type="button" onClick={captureFace}>
-                      Capture from camera
+                    <Button type="button" onClick={handleCaptureFace} disabled={!ready}>
+                      {ready ? "Capture photo" : "Starting camera…"}
                     </Button>
                   )}
                 </div>
               </div>
-              {!isSecureCameraContext ? (
-                <p className="text-xs text-destructive">
-                  Camera access needs HTTPS or localhost. You are on{" "}
-                  <strong className="font-semibold">{typeof window !== "undefined" ? window.location.origin : "this origin"}</strong>.
-                  Use localhost for testing camera, or upload a face photo below.
-                </p>
-              ) : null}
-              {cameraIssue ? <p className="text-xs text-destructive">{cameraIssue}</p> : null}
+              {cameraError ? <p className="text-xs text-destructive">{cameraError}</p> : null}
               <p className="text-sm text-muted-foreground">
-                If the browser blocks the camera, use{" "}
-                <strong className="text-foreground">Upload face photo</strong> (clear, front-facing selfie). On Chrome/Edge:
-                site icon or lock → Site settings → Camera → Allow.
+                Allow camera access when prompted. If it fails, use <strong>Upload face photo</strong> below.
               </p>
               <div>
                 <Label htmlFor="facePhoto">Upload face photo (alternative)</Label>
@@ -250,6 +180,7 @@ export default function ProfileVerification() {
                   id="facePhoto"
                   type="file"
                   accept="image/*"
+                  capture="user"
                   className="mt-1"
                   onChange={(e) => onFacePhotoFile(e.target.files?.[0] ?? null)}
                 />
@@ -259,7 +190,9 @@ export default function ProfileVerification() {
                 autoPlay
                 playsInline
                 muted
-                className="w-full max-w-md rounded-md border bg-muted/30"
+                className={`w-full max-w-md min-h-[240px] rounded-md border bg-muted/30 object-cover ${
+                  capturing ? "block" : "hidden"
+                }`}
               />
               {faceCapture ? (
                 <img src={faceCapture} alt="Face preview" className="max-w-md rounded-md border" />
@@ -276,4 +209,3 @@ export default function ProfileVerification() {
     </div>
   );
 }
-

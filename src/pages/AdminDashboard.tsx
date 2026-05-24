@@ -27,6 +27,8 @@ import {
   type VerificationQueueRow,
 } from "@/lib/adminApi";
 import { useAuthContext } from "@/components/auth/AuthProvider";
+import VerificationDocumentsDialog from "@/components/admin/VerificationDocumentsDialog";
+import { resolveDocumentUrl } from "@/lib/documentUrl";
 
 const AdminDashboard = () => {
   const apiBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ?? "";
@@ -40,6 +42,7 @@ const AdminDashboard = () => {
   const [rejectTarget, setRejectTarget] = useState<VerificationQueueRow | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
+  const [documentsTarget, setDocumentsTarget] = useState<VerificationQueueRow | null>(null);
 
   const loadAll = useCallback(async () => {
     setLoading(true);
@@ -203,50 +206,24 @@ const AdminDashboard = () => {
                         </p>
                         <p className="text-muted-foreground">{row.email}</p>
                         {row.id_number ? <p className="text-xs text-muted-foreground">ID: {row.id_number}</p> : null}
-                        <div className="mt-2 flex flex-wrap gap-2">
-                          {row.id_copy_path ? (
-                            <a
-                              href={`${apiBase}${row.id_copy_path}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-xs underline underline-offset-2"
-                            >
-                              ID copy
-                            </a>
-                          ) : null}
-                          {row.passport_copy_path ? (
-                            <a
-                              href={`${apiBase}${row.passport_copy_path}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-xs underline underline-offset-2"
-                            >
-                              Passport copy
-                            </a>
-                          ) : null}
-                          {row.face_capture_path ? (
-                            <a
-                              href={`${apiBase}${row.face_capture_path}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-xs underline underline-offset-2"
-                            >
-                              Face capture
-                            </a>
-                          ) : null}
-                          {row.doctor_letter_path ? (
-                            <a
-                              href={`${apiBase}${row.doctor_letter_path}`}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-xs underline underline-offset-2"
-                            >
-                              Doctor letter
-                            </a>
-                          ) : null}
-                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          {[
+                            resolveDocumentUrl(apiBase, row.id_copy_path, row.id_copy_data) && "ID",
+                            resolveDocumentUrl(apiBase, row.passport_copy_path, row.passport_copy_data) && "Passport",
+                            resolveDocumentUrl(apiBase, row.face_capture_path, row.face_capture_data) && "Face",
+                          ]
+                            .filter(Boolean)
+                            .join(" · ") || "No files on record"}
+                        </p>
                       </div>
-                      <div className="flex gap-2">
+                      <div className="flex flex-wrap gap-2">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => setDocumentsTarget(row)}
+                        >
+                          View documents
+                        </Button>
                         <Button size="sm" variant="outline" onClick={() => setRejectTarget(row)}>
                           Reject
                         </Button>
@@ -344,6 +321,15 @@ const AdminDashboard = () => {
             </Card>
           </TabsContent>
         </Tabs>
+
+        <VerificationDocumentsDialog
+          apiBase={apiBase}
+          candidate={documentsTarget}
+          open={documentsTarget !== null}
+          onOpenChange={(open) => {
+            if (!open) setDocumentsTarget(null);
+          }}
+        />
 
         <Dialog
           open={rejectTarget !== null}

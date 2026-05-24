@@ -261,6 +261,21 @@ async function persistBuffer(relativeDir, filename, buffer) {
   return `/uploads/${relativeDir}/${filename}`.replaceAll("\\", "/");
 }
 
+const MAX_DOCUMENT_DATA_BYTES = 4 * 1024 * 1024;
+
+function bufferToDataUrl(mimetype, buffer) {
+  if (!buffer?.length || buffer.length > MAX_DOCUMENT_DATA_BYTES) {
+    return null;
+  }
+  const type = mimetype?.startsWith("image/") || mimetype === "application/pdf" ? mimetype : "application/octet-stream";
+  return `data:${type};base64,${buffer.toString("base64")}`;
+}
+
+function dataUrlFromBase64Field(value) {
+  if (!value?.startsWith("data:")) return null;
+  return value;
+}
+
 async function persistProctoringSnapshots(profileId, snapshots = []) {
   const stored = [];
   for (const [index, snapshot] of snapshots.slice(0, 5).entries()) {
@@ -448,9 +463,13 @@ app.post(
       let idPath = null;
       let passportPath = null;
       let facePath = null;
+      let idCopyData = null;
+      let passportCopyData = null;
+      let faceCaptureData = dataUrlFromBase64Field(faceCaptureBase64) ?? null;
 
       if (idCopy) {
         idPath = await persistBuffer(`verification/${profileId}`, `id-${Date.now()}-${idCopy.originalname}`, idCopy.buffer);
+        idCopyData = bufferToDataUrl(idCopy.mimetype, idCopy.buffer);
       }
       if (passportCopy) {
         passportPath = await persistBuffer(
@@ -458,9 +477,16 @@ app.post(
           `passport-${Date.now()}-${passportCopy.originalname}`,
           passportCopy.buffer
         );
+        passportCopyData = bufferToDataUrl(passportCopy.mimetype, passportCopy.buffer);
       }
-      const buffer = Buffer.from(faceCaptureBase64.split(",")[1] ?? "", "base64");
-      facePath = await persistBuffer(`verification/${profileId}`, `face-${Date.now()}.png`, buffer);
+      if (!faceCaptureData && faceCaptureBase64?.startsWith("data:image")) {
+        const buffer = Buffer.from(faceCaptureBase64.split(",")[1] ?? "", "base64");
+        facePath = await persistBuffer(`verification/${profileId}`, `face-${Date.now()}.png`, buffer);
+        faceCaptureData = faceCaptureBase64;
+      } else if (faceCaptureData) {
+        const buffer = Buffer.from(faceCaptureBase64.split(",")[1] ?? "", "base64");
+        facePath = await persistBuffer(`verification/${profileId}`, `face-${Date.now()}.jpg`, buffer);
+      }
 
       await sql`
         update profiles
@@ -474,8 +500,26 @@ app.post(
       `;
 
       await sql`
-        insert into verification_documents (profile_id, id_copy_path, passport_copy_path, face_capture_path, review_status)
-        values (${profileId}, ${idPath}, ${passportPath}, ${facePath}, 'pending')
+        insert into verification_documents (
+          profile_id,
+          id_copy_path,
+          passport_copy_path,
+          face_capture_path,
+          id_copy_data,
+          passport_copy_data,
+          face_capture_data,
+          review_status
+        )
+        values (
+          ${profileId},
+          ${idPath},
+          ${passportPath},
+          ${facePath},
+          ${idCopyData},
+          ${passportCopyData},
+          ${faceCaptureData},
+          'pending'
+        )
       `;
 
       return res.status(201).json({ message: "Verification submitted." });
@@ -796,11 +840,22 @@ app.get("/api/admin/verification-queue", authMiddleware, adminMiddleware, async 
       vd.id_copy_path,
       vd.passport_copy_path,
       vd.face_capture_path,
+      vd.id_copy_data,
+      vd.passport_copy_data,
+      vd.face_capture_data,
       vd.doctor_letter_path,
       vd.created_at as documents_updated_at
     from profiles p
     left join lateral (
-      select id_copy_path, passport_copy_path, face_capture_path, doctor_letter_path, created_at
+      select
+        id_copy_path,
+        passport_copy_path,
+        face_capture_path,
+        id_copy_data,
+        passport_copy_data,
+        face_capture_data,
+        doctor_letter_path,
+        created_at
       from verification_documents
       where profile_id = p.id
       order by created_at desc

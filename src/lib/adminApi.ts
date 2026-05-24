@@ -26,6 +26,9 @@ export type VerificationQueueRow = {
   id_copy_path: string | null;
   passport_copy_path: string | null;
   face_capture_path: string | null;
+  id_copy_data: string | null;
+  passport_copy_data: string | null;
+  face_capture_data: string | null;
   doctor_letter_path: string | null;
   documents_updated_at: string | null;
 };
