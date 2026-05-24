@@ -1,5 +1,6 @@
 import { apiRequest, isApiConfigured } from "@/lib/api";
 import { getSession } from "@/lib/auth";
+import type { AdminDocumentKind } from "@/lib/documentUrl";
 
 async function adminToken() {
   const session = await getSession();
@@ -26,9 +27,10 @@ export type VerificationQueueRow = {
   id_copy_path: string | null;
   passport_copy_path: string | null;
   face_capture_path: string | null;
-  id_copy_data: string | null;
-  passport_copy_data: string | null;
-  face_capture_data: string | null;
+  has_id_copy?: boolean;
+  has_passport_copy?: boolean;
+  has_face_capture?: boolean;
+  has_doctor_letter?: boolean;
   doctor_letter_path: string | null;
   documents_updated_at: string | null;
 };
@@ -80,4 +82,32 @@ export async function fetchAdminAudit() {
   const token = await adminToken();
   if (!token) return null;
   return apiRequest<unknown[]>("/api/admin/audit", { token });
+}
+
+export async function fetchAdminDocument(
+  profileId: string,
+  kind: AdminDocumentKind
+): Promise<{ blob: Blob; objectUrl: string } | null> {
+  if (!isApiConfigured()) return null;
+  const token = await adminToken();
+  if (!token) return null;
+
+  const apiBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ?? "";
+  const response = await fetch(`${apiBase}/api/admin/documents/${profileId}/${kind}`, {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  if (!response.ok) {
+    let message = `Could not load document (${response.status})`;
+    try {
+      const body = (await response.json()) as { message?: string };
+      if (body.message) message = body.message;
+    } catch {
+      // ignore
+    }
+    throw new Error(message);
+  }
+
+  const blob = await response.blob();
+  return { blob, objectUrl: URL.createObjectURL(blob) };
 }

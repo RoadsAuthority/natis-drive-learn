@@ -1,4 +1,5 @@
-import { ExternalLink } from "lucide-react";
+import { useEffect, useState } from "react";
+import { ExternalLink, Loader2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -7,11 +8,11 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import type { VerificationQueueRow } from "@/lib/adminApi";
-import { isImageDocumentUrl, isPdfDocumentUrl, resolveDocumentUrl } from "@/lib/documentUrl";
+import { fetchAdminDocument, type VerificationQueueRow } from "@/lib/adminApi";
+import type { AdminDocumentKind } from "@/lib/documentUrl";
+import { isImageDocumentUrl, isPdfDocumentUrl } from "@/lib/documentUrl";
 
 type Props = {
-  apiBase: string;
   candidate: VerificationQueueRow | null;
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -19,28 +20,39 @@ type Props = {
 
 type DocSlot = {
   label: string;
-  path: string | null | undefined;
-  data: string | null | undefined;
+  kind: AdminDocumentKind;
+  available: boolean;
 };
 
-function DocumentPreview({ label, url }: { label: string; url: string }) {
-  if (isImageDocumentUrl(url)) {
+function DocumentPreview({
+  label,
+  objectUrl,
+  mimeType,
+}: {
+  label: string;
+  objectUrl: string;
+  mimeType: string;
+}) {
+  const isImage = mimeType.startsWith("image/") || isImageDocumentUrl(objectUrl);
+  const isPdf = mimeType === "application/pdf" || isPdfDocumentUrl(objectUrl);
+
+  if (isImage) {
     return (
       <div className="space-y-2">
         <p className="text-sm font-medium">{label}</p>
-        <a href={url} target="_blank" rel="noreferrer" className="block">
-          <img src={url} alt={label} className="max-h-64 w-full rounded-md border object-contain bg-muted/30" />
+        <a href={objectUrl} target="_blank" rel="noreferrer" className="block">
+          <img src={objectUrl} alt={label} className="max-h-64 w-full rounded-md border object-contain bg-muted/30" />
         </a>
       </div>
     );
   }
 
-  if (isPdfDocumentUrl(url)) {
+  if (isPdf) {
     return (
       <div className="space-y-2">
         <p className="text-sm font-medium">{label}</p>
         <Button variant="outline" size="sm" asChild>
-          <a href={url} target="_blank" rel="noreferrer">
+          <a href={objectUrl} target="_blank" rel="noreferrer">
             <ExternalLink className="mr-2 h-4 w-4" />
             Open PDF
           </a>
@@ -53,7 +65,7 @@ function DocumentPreview({ label, url }: { label: string; url: string }) {
     <div className="space-y-2">
       <p className="text-sm font-medium">{label}</p>
       <Button variant="outline" size="sm" asChild>
-        <a href={url} target="_blank" rel="noreferrer">
+        <a href={objectUrl} target="_blank" rel="noreferrer">
           <ExternalLink className="mr-2 h-4 w-4" />
           Open file
         </a>
@@ -62,22 +74,85 @@ function DocumentPreview({ label, url }: { label: string; url: string }) {
   );
 }
 
-export default function VerificationDocumentsDialog({ apiBase, candidate, open, onOpenChange }: Props) {
+function DocumentSlot({ profileId, label, kind, available }: DocSlot & { profileId: string }) {
+  const [objectUrl, setObjectUrl] = useState<string | null>(null);
+  const [mimeType, setMimeType] = useState("application/octet-stream");
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  useEffect(() => {
+    if (!available) return;
+
+    let active = true;
+    let revokeUrl: string | null = null;
+
+    const load = async () => {
+      setLoading(true);
+      setError(null);
+      setObjectUrl(null);
+      try {
+        const result = await fetchAdminDocument(profileId, kind);
+        if (!active || !result) return;
+        revokeUrl = result.objectUrl;
+        setObjectUrl(result.objectUrl);
+        setMimeType(result.blob.type || "application/octet-stream");
+      } catch (e) {
+        if (active) {
+          setError((e as Error).message);
+        }
+      } finally {
+        if (active) setLoading(false);
+      }
+    };
+
+    void load();
+
+    return () => {
+      active = false;
+      if (revokeUrl) URL.revokeObjectURL(revokeUrl);
+    };
+  }, [available, profileId, kind]);
+
+  if (!available) {
+    return null;
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center gap-2 text-sm text-muted-foreground">
+        <Loader2 className="h-4 w-4 animate-spin" />
+        Loading {label.toLowerCase()}…
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-1 rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm">
+        <p className="font-medium">{label}</p>
+        <p className="text-destructive">{error}</p>
+      </div>
+    );
+  }
+
+  if (!objectUrl) {
+    return null;
+  }
+
+  return <DocumentPreview label={label} objectUrl={objectUrl} mimeType={mimeType} />;
+}
+
+export default function VerificationDocumentsDialog({ candidate, open, onOpenChange }: Props) {
   if (!candidate) return null;
 
   const slots: DocSlot[] = [
-    { label: "ID copy", path: candidate.id_copy_path, data: candidate.id_copy_data },
-    { label: "Passport copy", path: candidate.passport_copy_path, data: candidate.passport_copy_data },
-    { label: "Face photo", path: candidate.face_capture_path, data: candidate.face_capture_data },
-    { label: "Doctor letter", path: candidate.doctor_letter_path, data: null },
+    { label: "ID copy", kind: "id", available: Boolean(candidate.has_id_copy) },
+    { label: "Passport copy", kind: "passport", available: Boolean(candidate.has_passport_copy) },
+    { label: "Face photo", kind: "face", available: Boolean(candidate.has_face_capture) },
+    { label: "Doctor letter", kind: "doctor", available: Boolean(candidate.has_doctor_letter) },
   ];
 
-  const resolved = slots
-    .map((slot) => ({
-      ...slot,
-      url: resolveDocumentUrl(apiBase, slot.path, slot.data),
-    }))
-    .filter((slot) => slot.url);
+  const availableSlots = slots.filter((slot) => slot.available);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -92,15 +167,15 @@ export default function VerificationDocumentsDialog({ apiBase, candidate, open, 
           </DialogDescription>
         </DialogHeader>
 
-        {resolved.length === 0 ? (
+        {availableSlots.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No documents on file. The candidate may need to resubmit, or files were lost after a server restart (use
-            upload again on the candidate side).
+            No documents on file. Ask the candidate to submit verification again (new uploads are saved in the
+            database and work after server restarts).
           </p>
         ) : (
           <div className="grid gap-6 sm:grid-cols-2">
-            {resolved.map((slot) => (
-              <DocumentPreview key={slot.label} label={slot.label} url={slot.url!} />
+            {availableSlots.map((slot) => (
+              <DocumentSlot key={slot.kind} profileId={candidate.id} {...slot} />
             ))}
           </div>
         )}

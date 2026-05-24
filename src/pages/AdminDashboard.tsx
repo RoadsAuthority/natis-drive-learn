@@ -28,10 +28,9 @@ import {
 } from "@/lib/adminApi";
 import { useAuthContext } from "@/components/auth/AuthProvider";
 import VerificationDocumentsDialog from "@/components/admin/VerificationDocumentsDialog";
-import { resolveDocumentUrl } from "@/lib/documentUrl";
+import { candidateHasDocument } from "@/lib/documentUrl";
 
 const AdminDashboard = () => {
-  const apiBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ?? "";
   const navigate = useNavigate();
   const [stats, setStats] = useState<AdminStats | null>(null);
   const [queue, setQueue] = useState<VerificationQueueRow[]>([]);
@@ -208,9 +207,9 @@ const AdminDashboard = () => {
                         {row.id_number ? <p className="text-xs text-muted-foreground">ID: {row.id_number}</p> : null}
                         <p className="text-xs text-muted-foreground mt-1">
                           {[
-                            resolveDocumentUrl(apiBase, row.id_copy_path, row.id_copy_data) && "ID",
-                            resolveDocumentUrl(apiBase, row.passport_copy_path, row.passport_copy_data) && "Passport",
-                            resolveDocumentUrl(apiBase, row.face_capture_path, row.face_capture_data) && "Face",
+                            candidateHasDocument(row.has_id_copy, row.id_copy_path, null) && "ID",
+                            candidateHasDocument(row.has_passport_copy, row.passport_copy_path, null) && "Passport",
+                            candidateHasDocument(row.has_face_capture, row.face_capture_path, null) && "Face",
                           ]
                             .filter(Boolean)
                             .join(" · ") || "No files on record"}
@@ -323,7 +322,6 @@ const AdminDashboard = () => {
         </Tabs>
 
         <VerificationDocumentsDialog
-          apiBase={apiBase}
           candidate={documentsTarget}
           open={documentsTarget !== null}
           onOpenChange={(open) => {

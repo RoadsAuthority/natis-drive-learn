@@ -6,7 +6,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
 import { neon } from "@neondatabase/serverless";
-import { mkdir, writeFile, readdir } from "node:fs/promises";
+import { mkdir, writeFile, readdir, readFile } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
@@ -83,7 +83,7 @@ if (!databaseUrl) {
 
 const sql = neon(databaseUrl);
 const upload = multer({ storage: multer.memoryStorage() });
-const uploadsDir = path.resolve(process.cwd(), "server", "uploads");
+const uploadsDir = path.resolve(serverDir, "uploads");
 const roadsAuthDir = path.resolve(process.cwd(), "RoadsAuth");
 
 app.use(
@@ -261,7 +261,31 @@ async function persistBuffer(relativeDir, filename, buffer) {
   return `/uploads/${relativeDir}/${filename}`.replaceAll("\\", "/");
 }
 
-const MAX_DOCUMENT_DATA_BYTES = 4 * 1024 * 1024;
+const MAX_DOCUMENT_DATA_BYTES = 6 * 1024 * 1024;
+
+const ADMIN_DOCUMENT_KINDS = {
+  id: { data: "id_copy_data", path: "id_copy_path" },
+  passport: { data: "passport_copy_data", path: "passport_copy_path" },
+  face: { data: "face_capture_data", path: "face_capture_path" },
+  doctor: { data: null, path: "doctor_letter_path" },
+};
+
+function parseStoredDataUrl(dataUrl) {
+  if (!dataUrl?.startsWith("data:")) return null;
+  const match = /^data:([^;]+);base64,(.+)$/.exec(dataUrl);
+  if (!match) return null;
+  return { mime: match[1], buffer: Buffer.from(match[2], "base64") };
+}
+
+function mimeFromFilename(filename) {
+  const ext = path.extname(filename).toLowerCase();
+  if (ext === ".pdf") return "application/pdf";
+  if (ext === ".png") return "image/png";
+  if (ext === ".jpg" || ext === ".jpeg") return "image/jpeg";
+  if (ext === ".webp") return "image/webp";
+  if (ext === ".gif") return "image/gif";
+  return "application/octet-stream";
+}
 
 function bufferToDataUrl(mimetype, buffer) {
   if (!buffer?.length || buffer.length > MAX_DOCUMENT_DATA_BYTES) {
@@ -827,6 +851,70 @@ app.get("/api/admin/stats", authMiddleware, adminMiddleware, async (_req, res) =
   });
 });
 
+app.get("/api/admin/documents/:profileId/:kind", authMiddleware, adminMiddleware, async (req, res) => {
+  const { profileId, kind } = req.params;
+  const mapping = ADMIN_DOCUMENT_KINDS[kind];
+  if (!mapping) {
+    return res.status(400).json({ message: "Invalid document type." });
+  }
+
+  try {
+    const [row] = await sql`
+      select
+        id_copy_data,
+        passport_copy_data,
+        face_capture_data,
+        doctor_letter_path,
+        id_copy_path,
+        passport_copy_path,
+        face_capture_path
+      from verification_documents
+      where profile_id = ${profileId}
+      order by created_at desc
+      limit 1
+    `;
+    if (!row) {
+      return res.status(404).json({ message: "No documents found for this candidate." });
+    }
+
+    if (mapping.data) {
+      const parsed = parseStoredDataUrl(row[mapping.data]);
+      if (parsed) {
+        res.setHeader("Content-Type", parsed.mime);
+        res.setHeader("Cache-Control", "private, max-age=3600");
+        return res.send(parsed.buffer);
+      }
+    }
+
+    const storedPath = row[mapping.path];
+    if (storedPath) {
+      const relative = storedPath.replace(/^\/uploads\/?/, "");
+      const fullPath = path.join(uploadsDir, relative);
+      try {
+        const buffer = await readFile(fullPath);
+        res.setHeader("Content-Type", mimeFromFilename(fullPath));
+        res.setHeader("Cache-Control", "private, max-age=300");
+        return res.send(buffer);
+      } catch {
+        // Disk copy missing (common on Render after redeploy).
+      }
+    }
+
+    return res.status(404).json({
+      message:
+        "Document not available. Ask the candidate to resubmit verification (files are stored in the database on new submissions).",
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Admin document fetch failed:", message);
+    return res.status(500).json({
+      message: isMissingSchemaError(error)
+        ? "Database schema is out of date. Run npm run db:migrate and restart the API."
+        : "Could not load document.",
+    });
+  }
+});
+
 app.get("/api/admin/verification-queue", authMiddleware, adminMiddleware, async (_req, res) => {
   const rows = await sql`
     select
@@ -840,10 +928,11 @@ app.get("/api/admin/verification-queue", authMiddleware, adminMiddleware, async 
       vd.id_copy_path,
       vd.passport_copy_path,
       vd.face_capture_path,
-      vd.id_copy_data,
-      vd.passport_copy_data,
-      vd.face_capture_data,
       vd.doctor_letter_path,
+      (vd.id_copy_data is not null or vd.id_copy_path is not null) as has_id_copy,
+      (vd.passport_copy_data is not null or vd.passport_copy_path is not null) as has_passport_copy,
+      (vd.face_capture_data is not null or vd.face_capture_path is not null) as has_face_capture,
+      (vd.doctor_letter_path is not null) as has_doctor_letter,
       vd.created_at as documents_updated_at
     from profiles p
     left join lateral (
