@@ -37,7 +37,7 @@ function buildLines(lineCount: number): SnellenLine[] {
 
 export default function SnellenScreening({
   lineCount = 5,
-  secondsPerLine = 5,
+  secondsPerLine = 10,
   passThreshold = 0.8,
   onComplete,
   onCancel,

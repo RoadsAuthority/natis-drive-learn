@@ -52,12 +52,12 @@ export default function EyeTest() {
             <Eye className="h-5 w-5" /> Vision screening
           </h1>
           <p className="text-sm text-muted-foreground">
-            Read each Snellen-style line within five seconds. Lines get smaller as you progress.
+            Read each Snellen-style line within ten seconds. Lines get smaller as you progress.
           </p>
           {screening ? (
             <SnellenScreening
               lineCount={5}
-              secondsPerLine={5}
+              secondsPerLine={10}
               passThreshold={0.8}
               onComplete={(passed) => void handleScreeningComplete(passed)}
               onCancel={() => setScreening(false)}
