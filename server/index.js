@@ -12,7 +12,7 @@ import { createServer } from "node:http";
 import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { addDays, buildScheduleState, deriveReviewFlag } from "./lib/testSchedule.js";
+import { addDays, buildScheduleState, deriveReviewFlag, failRebookAfter } from "./lib/testSchedule.js";
 
 const serverDir = path.dirname(fileURLToPath(import.meta.url));
 const envCandidates = [path.resolve(serverDir, ".env")];
@@ -209,7 +209,7 @@ async function getLearnerSchedule(profileId) {
   }
 
   const [lastAttempt] = await sql`
-    select id, passed, created_at
+    select id, score, total, percentage, passed, created_at
     from attempts
     where profile_id = ${profileId}
     order by created_at desc
@@ -433,6 +433,7 @@ app.get("/api/profile/me", authMiddleware, async (req, res) => {
     }
     const learner = await getLearnerSchedule(profileId);
     const schedule = learner?.schedule;
+    const lastAttempt = learner?.lastAttempt;
     return res.json({
       ...rows[0],
       test_schedule: schedule
@@ -447,6 +448,9 @@ app.get("/api/profile/me", authMiddleware, async (req, res) => {
             last_attempt_at: schedule.lastAttemptAt?.toISOString() ?? null,
             last_attempt_passed: schedule.lastAttemptPassed,
             last_attempt_failed: schedule.lastAttemptFailed,
+            last_attempt_score: lastAttempt?.score ?? null,
+            last_attempt_total: lastAttempt?.total ?? null,
+            last_attempt_percentage: lastAttempt?.percentage != null ? Number(lastAttempt.percentage) : null,
           }
         : null,
     });
@@ -458,6 +462,49 @@ app.get("/api/profile/me", authMiddleware, async (req, res) => {
         ? "Database schema is out of date. Run npm run db:migrate and restart the API."
         : "Could not load profile.",
     });
+  }
+});
+
+app.get("/api/certificate/me", authMiddleware, async (req, res) => {
+  const profileId = req.user.sub;
+  try {
+    const [profile] = await sql`
+      select first_name, surname, id_number, licence_code, email
+      from profiles
+      where id = ${profileId}
+      limit 1
+    `;
+    if (!profile) {
+      return res.status(404).json({ message: "Profile not found." });
+    }
+    const [attempt] = await sql`
+      select id, score, total, percentage, created_at
+      from attempts
+      where profile_id = ${profileId} and passed = true
+      order by created_at desc
+      limit 1
+    `;
+    if (!attempt) {
+      return res.status(404).json({
+        message: "Your certificate is available after you pass the learner theory test.",
+      });
+    }
+    const fullName = [profile.first_name, profile.surname].filter(Boolean).join(" ").trim() || profile.email;
+    return res.json({
+      fullName,
+      idNumber: profile.id_number,
+      licenceCode: profile.licence_code ?? "B",
+      email: profile.email,
+      score: attempt.score,
+      total: attempt.total,
+      percentage: Number(attempt.percentage),
+      passedAt: attempt.created_at,
+      certificateId: `NATIS-LT-${String(attempt.id).replace(/-/g, "").slice(0, 8).toUpperCase()}`,
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Certificate lookup failed:", message);
+    return res.status(500).json({ message: "Could not load certificate." });
   }
 });
 
@@ -791,8 +838,8 @@ app.post("/api/attempts", authMiddleware, async (req, res) => {
   };
   const reviewFlagged = deriveReviewFlag(proctoringSummary, suspicionScore);
   const attemptAt = new Date();
-  const nextTestEligibleAt = passed ? addDays(attemptAt, 21) : addDays(attemptAt, 91);
-  const nextBookingEligibleAt = passed ? null : addDays(attemptAt, 91);
+  const nextTestEligibleAt = passed ? addDays(attemptAt, 21) : failRebookAfter(attemptAt);
+  const nextBookingEligibleAt = passed ? null : failRebookAfter(attemptAt);
   const licenseCollectionFrom = passed ? addDays(attemptAt, 7) : null;
 
   await sql`

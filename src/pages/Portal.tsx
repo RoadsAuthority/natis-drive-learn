@@ -12,6 +12,7 @@ import {
   LogOut,
   Shield,
   User,
+  Award,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -144,8 +145,8 @@ export default function Portal() {
           : canTakeTest
             ? "Ready"
             : "Locked",
-      href: testPassed ? "/results" : "/instructions",
-      actionLabel: testPassed ? "View result" : testAttempted ? "View info" : "Start",
+      href: testPassed ? "/certificate" : "/instructions",
+      actionLabel: testPassed ? "Certificate" : testAttempted ? "View info" : "Start",
     },
   ];
 
@@ -168,7 +169,17 @@ export default function Portal() {
             <h1 className="text-2xl font-bold tracking-tight">Learner Licence Portal</h1>
             <p className="text-sm text-muted-foreground">{user?.email}</p>
           </div>
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" onClick={() => navigate("/my-profile")}>
+              <User className="mr-2 h-4 w-4" />
+              My profile
+            </Button>
+            {testPassed ? (
+              <Button variant="outline" size="sm" onClick={() => navigate("/certificate")}>
+                <Award className="mr-2 h-4 w-4" />
+                Certificate
+              </Button>
+            ) : null}
             <Button variant="outline" size="sm" onClick={() => void refresh()}>
               Refresh status
             </Button>
@@ -191,58 +202,31 @@ export default function Portal() {
           <Card className="border-success/30 bg-success/5 p-6 space-y-4">
             <div className="flex items-center gap-3">
               <div className="rounded-full bg-success/10 p-2">
-                <User className="h-6 w-6 text-success" />
+                <CheckCircle2 className="h-6 w-6 text-success" />
               </div>
               <div>
-                <h2 className="text-xl font-semibold">Your learner profile</h2>
-                <p className="text-sm text-muted-foreground">All steps complete — you passed the theory test.</p>
+                <h2 className="text-xl font-semibold">Congratulations — journey complete!</h2>
+                <p className="text-sm text-muted-foreground">
+                  You passed the theory test. View your profile and download your certificate.
+                </p>
               </div>
             </div>
-            <dl className="grid gap-3 sm:grid-cols-2 text-sm">
-              <div>
-                <dt className="text-muted-foreground">Full name</dt>
-                <dd className="font-medium">
-                  {[profile?.first_name, profile?.surname].filter(Boolean).join(" ") || "—"}
-                </dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">ID number</dt>
-                <dd className="font-medium">{profile?.id_number ?? "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Licence code</dt>
-                <dd className="font-medium">{profile?.licence_code ?? "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Email</dt>
-                <dd className="font-medium">{profile?.email ?? user?.email ?? "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Documents</dt>
-                <dd className="font-medium text-success">Verified</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Vision screening</dt>
-                <dd className="font-medium capitalize">{profile?.eye_test_status ?? "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Payment</dt>
-                <dd className="font-medium capitalize">{profile?.payment_status ?? "—"}</dd>
-              </div>
-              <div>
-                <dt className="text-muted-foreground">Theory test</dt>
-                <dd className="font-medium text-success">Passed</dd>
-              </div>
-            </dl>
             {testSchedule?.license_collection_from ? (
               <p className="text-sm rounded-md border border-success/20 bg-background/60 p-3">
                 Collect your learner&apos;s licence from{" "}
                 <strong>{formatDateShort(testSchedule.license_collection_from) ?? "—"}</strong>.
               </p>
             ) : null}
-            <Button variant="outline" size="sm" onClick={() => navigate("/results")}>
-              View test result
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button onClick={() => navigate("/my-profile")}>
+                <User className="mr-2 h-4 w-4" />
+                My profile
+              </Button>
+              <Button variant="default" onClick={() => navigate("/certificate")}>
+                <Award className="mr-2 h-4 w-4" />
+                View certificate
+              </Button>
+            </div>
           </Card>
         ) : (
           <>

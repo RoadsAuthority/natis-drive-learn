@@ -38,6 +38,9 @@ export type UserProfile = {
     last_attempt_at: string | null;
     last_attempt_passed: boolean;
     last_attempt_failed: boolean;
+    last_attempt_score: number | null;
+    last_attempt_total: number | null;
+    last_attempt_percentage: number | null;
   } | null;
 };
 

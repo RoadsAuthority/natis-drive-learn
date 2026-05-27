@@ -21,6 +21,8 @@ import BookingReadyRoute from "./components/guards/BookingReadyRoute";
 import NonAdminRoute from "./components/guards/NonAdminRoute";
 import { AuthProvider } from "./components/auth/AuthProvider";
 import Portal from "./pages/Portal";
+import CandidateProfile from "./pages/CandidateProfile";
+import Certificate from "./pages/Certificate";
 
 const queryClient = new QueryClient();
 
@@ -47,6 +49,22 @@ const App = () => (
               element={
                 <ProtectedRoute role="candidate">
                   <Portal />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/my-profile"
+              element={
+                <ProtectedRoute role="candidate">
+                  <CandidateProfile />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/certificate"
+              element={
+                <ProtectedRoute role="candidate">
+                  <Certificate />
                 </ProtectedRoute>
               }
             />

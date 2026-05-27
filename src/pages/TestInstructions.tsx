@@ -52,7 +52,7 @@ const TestInstructions = () => {
                     <li>You must score at least <strong>80%</strong> to pass.</li>
                     <li>You have <strong>60 minutes</strong> to complete the test.</li>
                     <li>You may take the test only once every <strong>3 weeks</strong>.</li>
-                    <li>If you fail, you must wait <strong>13 weeks</strong> before registering for another test.</li>
+                    <li>If you fail, you must wait <strong>5 minutes</strong> before trying again (demo setting).</li>
                     <li>Your webcam stays active during the test. Tab switches and missing face events are flagged for review.</li>
                   </ul>
                 </div>

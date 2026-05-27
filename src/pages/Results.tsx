@@ -2,8 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { CheckCircle2, XCircle, Download, Home } from "lucide-react";
-import { requestResultDocument } from "@/lib/natisApi";
+import { CheckCircle2, XCircle, Award, Home } from "lucide-react";
 
 type TestResults = {
   score: number;
@@ -19,7 +18,12 @@ type TestResults = {
 
 function formatDate(value?: string | null) {
   if (!value) return null;
-  return new Date(value).toLocaleDateString();
+  return new Date(value).toLocaleString("en-GB", {
+    day: "numeric",
+    month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 const Results = () => {
@@ -36,24 +40,6 @@ const Results = () => {
   }, [navigate]);
 
   if (!results) return null;
-
-  const downloadResult = async () => {
-    await requestResultDocument(results);
-    const documentText = [
-      "Learner Theory Test Result",
-      `Date: ${new Date().toLocaleDateString()}`,
-      `Score: ${results.score}/${results.total}`,
-      `Percentage: ${results.percentage}%`,
-      `Status: ${results.passed ? "PASSED" : "FAILED"}`,
-    ].join("\n");
-    const blob = new Blob([documentText], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = "natis-result.txt";
-    link.click();
-    URL.revokeObjectURL(url);
-  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background flex items-center justify-center p-4">
@@ -101,9 +87,7 @@ const Results = () => {
           {results.passed ? (
             <div className="space-y-4">
               <div className="bg-success/10 border border-success/20 rounded-lg p-4 mb-6">
-                <p className="text-success font-medium">
-                  Your result is available for download below.
-                </p>
+                <p className="text-success font-medium">Your certificate of achievement is ready.</p>
                 {results.licenseCollectionFrom ? (
                   <p className="text-sm text-success mt-2">
                     You may collect your learner&apos;s licence from {formatDate(results.licenseCollectionFrom)}.
@@ -112,24 +96,28 @@ const Results = () => {
               </div>
               {results.reviewFlagged ? (
                 <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 text-sm">
-                  This session was flagged for verifier review because of monitoring signals. Your result is still
-                  recorded.
+                  This session was flagged for verifier review. Your pass result is still recorded.
                 </div>
               ) : null}
-              <Button size="lg" className="w-full md:w-auto" onClick={() => void downloadResult()}>
-                <Download className="mr-2 h-4 w-4" />
-                Download certificate
-              </Button>
+              <div className="flex flex-wrap gap-3 justify-center">
+                <Button size="lg" onClick={() => navigate("/certificate")}>
+                  <Award className="mr-2 h-4 w-4" />
+                  View certificate
+                </Button>
+                <Button size="lg" variant="outline" onClick={() => navigate("/my-profile")}>
+                  My profile
+                </Button>
+              </div>
             </div>
           ) : (
             <div className="space-y-4">
               <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4 mb-6">
                 <p className="text-destructive font-medium">
-                  You may register for another test after the 13-week waiting period.
+                  You can try again after a short waiting period (5 minutes for this demo).
                 </p>
                 {results.nextBookingEligibleAt ? (
                   <p className="text-sm text-destructive mt-2">
-                    Earliest re-registration date: {formatDate(results.nextBookingEligibleAt)}.
+                    Eligible again from: {formatDate(results.nextBookingEligibleAt)}.
                   </p>
                 ) : null}
               </div>

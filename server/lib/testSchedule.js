@@ -1,11 +1,18 @@
 const RETAKE_MIN_DAYS = 21;
-const FAIL_REBOOK_DAYS = 91;
+/** Demo: 5 minutes after a fail (override with FAIL_REBOOK_MINUTES env on server). */
+const FAIL_REBOOK_MINUTES = Number(process.env.FAIL_REBOOK_MINUTES ?? 5);
 const LICENSE_COLLECTION_DAYS = 7;
 const PROCTORING_REVIEW_THRESHOLD = 30;
 
 function addDays(date, days) {
   const next = new Date(date);
   next.setDate(next.getDate() + days);
+  return next;
+}
+
+function addMinutes(date, minutes) {
+  const next = new Date(date);
+  next.setMinutes(next.getMinutes() + minutes);
   return next;
 }
 
@@ -24,6 +31,26 @@ function formatDateLabel(date) {
   });
 }
 
+function formatWaitLabel(date) {
+  if (!date) return null;
+  const target = new Date(date);
+  const now = new Date();
+  const diffMs = target.getTime() - now.getTime();
+  if (diffMs > 0 && diffMs < 24 * 60 * 60 * 1000) {
+    return target.toLocaleString("en-GB", {
+      hour: "2-digit",
+      minute: "2-digit",
+      day: "numeric",
+      month: "short",
+    });
+  }
+  return formatDateLabel(target);
+}
+
+function failRebookAfter(attemptAt) {
+  return addMinutes(attemptAt, FAIL_REBOOK_MINUTES);
+}
+
 function buildScheduleState(profile, lastAttempt) {
   const now = new Date();
   const passedAttempt = lastAttempt?.passed ? lastAttempt : null;
@@ -32,12 +59,14 @@ function buildScheduleState(profile, lastAttempt) {
   const nextTestEligibleAt = maxDate(
     profile?.next_test_eligible_at,
     lastAttemptAt
-      ? addDays(lastAttemptAt, failedAttempt ? FAIL_REBOOK_DAYS : RETAKE_MIN_DAYS)
+      ? failedAttempt
+        ? failRebookAfter(lastAttemptAt)
+        : addDays(lastAttemptAt, RETAKE_MIN_DAYS)
       : null
   );
   const nextBookingEligibleAt = maxDate(
     profile?.next_booking_eligible_at,
-    failedAttempt?.created_at ? addDays(failedAttempt.created_at, FAIL_REBOOK_DAYS) : null
+    failedAttempt?.created_at ? failRebookAfter(new Date(failedAttempt.created_at)) : null
   );
   const licenseCollectionFrom = maxDate(
     profile?.license_collection_from,
@@ -57,11 +86,11 @@ function buildScheduleState(profile, lastAttempt) {
   } else {
     if (nextTestEligibleAt && nextTestEligibleAt > now) {
       canTakeTest = false;
-      testBlockReason = `You can take the test again from ${formatDateLabel(nextTestEligibleAt)}.`;
+      testBlockReason = `You can take the test again from ${formatWaitLabel(nextTestEligibleAt)}.`;
     }
     if (nextBookingEligibleAt && nextBookingEligibleAt > now) {
       canBookTest = false;
-      bookingBlockReason = `You can register for another test from ${formatDateLabel(nextBookingEligibleAt)}.`;
+      bookingBlockReason = `You can register for another test from ${formatWaitLabel(nextBookingEligibleAt)}.`;
     }
   }
 
@@ -87,10 +116,12 @@ function deriveReviewFlag(summary, suspicionScore) {
 
 export {
   RETAKE_MIN_DAYS,
-  FAIL_REBOOK_DAYS,
+  FAIL_REBOOK_MINUTES,
   LICENSE_COLLECTION_DAYS,
   PROCTORING_REVIEW_THRESHOLD,
   addDays,
+  addMinutes,
+  failRebookAfter,
   buildScheduleState,
   deriveReviewFlag,
 };

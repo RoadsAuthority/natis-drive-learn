@@ -14,7 +14,8 @@ Full-stack assignment prototype: candidate registration, document verification, 
 - Verifier console (approve/reject with reasons, bookings, flagged attempts, audit log)
 - Snellen-style vision screening + optional doctor letter
 - Timed theory test (70 questions, 80% pass) with webcam monitoring signals
-- Retake rules: 3 weeks between attempts, 13 weeks after a fail, collection date on pass
+- Retake rules: 3 weeks between passed attempts; **5-minute** wait after a fail (demo); collection date on pass
+- Candidate profile and certificate of achievement on pass
 - Study PDFs served from `RoadsAuth/`
 
 ## Quick start (local)
