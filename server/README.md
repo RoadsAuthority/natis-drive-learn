@@ -66,6 +66,9 @@ PDFs are not parsed into database rows automatically. To load questions into Neo
    - `question` (string)
    - `options` (array of `{ "id": "a", "text": "..." }` — ids should match what the UI submits, usually `a`–`d`)
    - `correctAnswer` (string, same as one option `id`)
+   - `imageUrl` (optional string, e.g. `/question-images/stop-sign.svg` — static files in `public/question-images/`)
+
+The learner test serves **70 random** active questions per attempt (`ORDER BY random()`). Answer options are shuffled on each load. Correct answers are graded server-side by question `id` (not sent to the browser).
 
 2. Run (from repo root, with `DATABASE_URL` in `server/.env`):
 

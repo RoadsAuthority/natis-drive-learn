@@ -35,6 +35,7 @@ const core = [
       { id: "d", text: "Speed up to clear the intersection" },
     ],
     correctAnswer: "c",
+    imageUrl: "/question-images/stop-sign.svg",
   },
   {
     question: "What does a yellow traffic light indicate?",
@@ -45,6 +46,51 @@ const core = [
       { id: "d", text: "Reverse" },
     ],
     correctAnswer: "a",
+    imageUrl: "/question-images/warning-triangle.svg",
+  },
+  {
+    question: "The sign shown below means you must:",
+    options: [
+      { id: "a", text: "Come to a complete stop" },
+      { id: "b", text: "Speed up" },
+      { id: "c", text: "Park here" },
+      { id: "d", text: "Overtake other vehicles" },
+    ],
+    correctAnswer: "a",
+    imageUrl: "/question-images/stop-sign.svg",
+  },
+  {
+    question: "The triangular sign shown below warns you to:",
+    options: [
+      { id: "a", text: "Stop immediately" },
+      { id: "b", text: "Be cautious — hazard ahead" },
+      { id: "c", text: "Turn left only" },
+      { id: "d", text: "Increase speed" },
+    ],
+    correctAnswer: "b",
+    imageUrl: "/question-images/warning-triangle.svg",
+  },
+  {
+    question: "The road marking shown below indicates:",
+    options: [
+      { id: "a", text: "A pedestrian crossing ahead" },
+      { id: "b", text: "No parking zone" },
+      { id: "c", text: "Motorway entry" },
+      { id: "d", text: "One-way street" },
+    ],
+    correctAnswer: "a",
+    imageUrl: "/question-images/pedestrian-crossing.svg",
+  },
+  {
+    question: "When you see the sign below, you should:",
+    options: [
+      { id: "a", text: "Give way to other traffic" },
+      { id: "b", text: "Stop completely" },
+      { id: "c", text: "Ignore it if the road is clear" },
+      { id: "d", text: "Reverse" },
+    ],
+    correctAnswer: "a",
+    imageUrl: "/question-images/yield-sign.svg",
   },
   {
     question: "The minimum following distance in good conditions should be:",
@@ -109,7 +155,7 @@ const core = [
 ];
 
 const letters = ["a", "b", "c", "d"];
-const extra = Array.from({ length: 60 }, (_, i) => {
+const extra = Array.from({ length: 56 }, (_, i) => {
   const n = i + 11;
   const correct = letters[i % 4];
   return {

@@ -5,17 +5,18 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { Camera, Clock, ChevronLeft, ChevronRight, Flag } from "lucide-react";
-import { mockQuestions } from "@/data/mockQuestions";
 import { fetchQuestions, markAttempt, saveAttempt } from "@/lib/natisApi";
 import { useTestProctoring } from "@/hooks/useTestProctoring";
+import type { TestQuestion } from "@/types/question";
 
 const Test = () => {
   const navigate = useNavigate();
   const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [answers, setAnswers] = useState<Record<number, string>>({});
+  const [answers, setAnswers] = useState<Record<string, string>>({});
   const [timeRemaining, setTimeRemaining] = useState(3600);
   const [flagged, setFlagged] = useState<Set<number>>(new Set());
-  const [questions, setQuestions] = useState(mockQuestions);
+  const [questions, setQuestions] = useState<TestQuestion[]>([]);
+  const [loadingQuestions, setLoadingQuestions] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
   const consentGranted = sessionStorage.getItem("natis-proctoring-consent") === "true";
@@ -32,36 +33,43 @@ const Test = () => {
 
   useEffect(() => {
     const loadQuestions = async () => {
+      setLoadingQuestions(true);
       try {
         const data = await fetchQuestions();
-        if (data?.length) setQuestions(data);
+        if (data?.length) {
+          setQuestions(data);
+        } else {
+          toast.error("No questions available. Contact your administrator.");
+          navigate("/portal");
+        }
       } catch (e) {
         toast.error("Could not load question bank from API.", {
           description: (e as Error).message,
         });
+        navigate("/portal");
+      } finally {
+        setLoadingQuestions(false);
       }
     };
     void loadQuestions();
-  }, []);
+  }, [navigate]);
 
   const handleSubmit = useCallback(async () => {
     if (submittingRef.current || !questions.length) return;
     submittingRef.current = true;
     setSubmitting(true);
     try {
-      let score = questions.reduce((acc, q, idx) => acc + (answers[idx] === q.correctAnswer ? 1 : 0), 0);
-      const marked = await markAttempt(answers, questions.length);
-      if (marked?.score !== undefined) {
-        score = Number(marked.score);
-      }
-      const percentage = (score / questions.length) * 100;
-      const passed = percentage >= 80;
-      const saved = await saveAttempt(score, questions.length, percentage, passed, proctoring.summary);
+      const marked = await markAttempt(answers);
+      const score = Number(marked.score);
+      const total = marked.total ?? questions.length;
+      const percentage = Number(marked.percentage);
+      const passed = Boolean(marked.passed);
+      const saved = await saveAttempt(score, total, percentage, passed, proctoring.summary);
       localStorage.setItem(
         "testResults",
         JSON.stringify({
           score,
-          total: questions.length,
+          total,
           percentage: percentage.toFixed(1),
           passed,
           reviewFlagged: saved.reviewFlagged,
@@ -100,8 +108,8 @@ const Test = () => {
     return `${mins}:${secs.toString().padStart(2, "0")}`;
   };
 
-  const handleAnswer = (answer: string) => {
-    setAnswers((prev) => ({ ...prev, [currentQuestion]: answer }));
+  const handleAnswer = (questionId: string, answer: string) => {
+    setAnswers((prev) => ({ ...prev, [questionId]: answer }));
   };
 
   const handleNext = () => {
@@ -130,9 +138,14 @@ const Test = () => {
 
   const question = questions[currentQuestion];
   const progress = questions.length ? ((currentQuestion + 1) / questions.length) * 100 : 0;
+  const selectedAnswer = question ? answers[question.id] : undefined;
 
-  if (!question) {
-    return null;
+  if (loadingQuestions || !question) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <p className="text-muted-foreground">Loading your test questions…</p>
+      </div>
+    );
   }
 
   return (
@@ -188,15 +201,25 @@ const Test = () => {
             </Button>
           </div>
 
-          <p className="text-lg mb-8 leading-relaxed">{question.question}</p>
+          <p className="text-lg mb-6 leading-relaxed">{question.question}</p>
+
+          {question.imageUrl ? (
+            <div className="mb-8 flex justify-center rounded-lg border bg-muted/30 p-4">
+              <img
+                src={question.imageUrl}
+                alt="Diagram for this question"
+                className="max-h-48 w-full max-w-md object-contain"
+              />
+            </div>
+          ) : null}
 
           <div className="space-y-3">
             {question.options.map((option) => (
               <button
                 key={option.id}
-                onClick={() => handleAnswer(option.id)}
+                onClick={() => handleAnswer(question.id, option.id)}
                 className={`w-full p-4 rounded-lg border-2 transition-all text-left ${
-                  answers[currentQuestion] === option.id
+                  selectedAnswer === option.id
                     ? "border-primary bg-primary/5"
                     : "border-border hover:border-primary/50 bg-card"
                 }`}
@@ -229,14 +252,14 @@ const Test = () => {
         <Card className="p-6 mt-6 shadow-lg">
           <h3 className="font-semibold mb-4">Question navigator</h3>
           <div className="grid grid-cols-10 gap-2">
-            {questions.map((_, idx) => (
+            {questions.map((q, idx) => (
               <button
-                key={idx}
+                key={q.id}
                 onClick={() => setCurrentQuestion(idx)}
                 className={`aspect-square rounded-md text-sm font-medium transition-colors ${
                   currentQuestion === idx
                     ? "bg-primary text-primary-foreground"
-                    : answers[idx]
+                    : answers[q.id]
                       ? "bg-success/20 text-success-foreground hover:bg-success/30"
                       : "bg-muted hover:bg-muted/80"
                 } ${flagged.has(idx) ? "ring-2 ring-destructive" : ""}`}

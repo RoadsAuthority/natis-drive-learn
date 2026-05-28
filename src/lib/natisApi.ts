@@ -1,5 +1,6 @@
 import { apiRequest, isApiConfigured } from "@/lib/api";
 import { getSession } from "@/lib/auth";
+import type { TestQuestion } from "@/types/question";
 
 function assertApiConfigured() {
   if (!isApiConfigured()) {
@@ -67,19 +68,19 @@ export async function confirmPayment(providerOrderId: string, amount = 12) {
 
 export async function fetchQuestions() {
   const token = await withToken();
-  return apiRequest<Array<{ question: string; options: Array<{ id: string; text: string }>; correctAnswer: string }>>(
-    "/api/questions/active",
-    { token }
-  );
+  return apiRequest<TestQuestion[]>("/api/questions/active", { token });
 }
 
-export async function markAttempt(answers: Record<number, string>, total: number) {
+export async function markAttempt(answers: Record<string, string>) {
   const token = await withToken();
-  return apiRequest<{ score: number; percentage: number; passed: boolean }>("/api/attempts/mark", {
-    method: "POST",
-    token,
-    body: { answers, total },
-  });
+  return apiRequest<{ score: number; percentage: number; passed: boolean; total: number }>(
+    "/api/attempts/mark",
+    {
+      method: "POST",
+      token,
+      body: { answers },
+    }
+  );
 }
 
 export async function saveAttempt(

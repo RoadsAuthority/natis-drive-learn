@@ -63,7 +63,8 @@
         "text": "Speed up to clear the intersection"
       }
     ],
-    "correctAnswer": "c"
+    "correctAnswer": "c",
+    "imageUrl": "/question-images/stop-sign.svg"
   },
   {
     "question": "What does a yellow traffic light indicate?",
@@ -85,7 +86,100 @@
         "text": "Reverse"
       }
     ],
-    "correctAnswer": "a"
+    "correctAnswer": "a",
+    "imageUrl": "/question-images/warning-triangle.svg"
+  },
+  {
+    "question": "The sign shown below means you must:",
+    "options": [
+      {
+        "id": "a",
+        "text": "Come to a complete stop"
+      },
+      {
+        "id": "b",
+        "text": "Speed up"
+      },
+      {
+        "id": "c",
+        "text": "Park here"
+      },
+      {
+        "id": "d",
+        "text": "Overtake other vehicles"
+      }
+    ],
+    "correctAnswer": "a",
+    "imageUrl": "/question-images/stop-sign.svg"
+  },
+  {
+    "question": "The triangular sign shown below warns you to:",
+    "options": [
+      {
+        "id": "a",
+        "text": "Stop immediately"
+      },
+      {
+        "id": "b",
+        "text": "Be cautious — hazard ahead"
+      },
+      {
+        "id": "c",
+        "text": "Turn left only"
+      },
+      {
+        "id": "d",
+        "text": "Increase speed"
+      }
+    ],
+    "correctAnswer": "b",
+    "imageUrl": "/question-images/warning-triangle.svg"
+  },
+  {
+    "question": "The road marking shown below indicates:",
+    "options": [
+      {
+        "id": "a",
+        "text": "A pedestrian crossing ahead"
+      },
+      {
+        "id": "b",
+        "text": "No parking zone"
+      },
+      {
+        "id": "c",
+        "text": "Motorway entry"
+      },
+      {
+        "id": "d",
+        "text": "One-way street"
+      }
+    ],
+    "correctAnswer": "a",
+    "imageUrl": "/question-images/pedestrian-crossing.svg"
+  },
+  {
+    "question": "When you see the sign below, you should:",
+    "options": [
+      {
+        "id": "a",
+        "text": "Give way to other traffic"
+      },
+      {
+        "id": "b",
+        "text": "Stop completely"
+      },
+      {
+        "id": "c",
+        "text": "Ignore it if the road is clear"
+      },
+      {
+        "id": "d",
+        "text": "Reverse"
+      }
+    ],
+    "correctAnswer": "a",
+    "imageUrl": "/question-images/yield-sign.svg"
   },
   {
     "question": "The minimum following distance in good conditions should be:",
@@ -1431,94 +1525,6 @@
   },
   {
     "question": "Official syllabus item 66: choose the safest and most lawful action in the described traffic situation.",
-    "options": [
-      {
-        "id": "a",
-        "text": "Action A — comply with signs and signals"
-      },
-      {
-        "id": "b",
-        "text": "Action B — yield where required"
-      },
-      {
-        "id": "c",
-        "text": "Action C — proceed only when safe"
-      },
-      {
-        "id": "d",
-        "text": "Action D — stop if uncertain"
-      }
-    ],
-    "correctAnswer": "d"
-  },
-  {
-    "question": "Official syllabus item 67: choose the safest and most lawful action in the described traffic situation.",
-    "options": [
-      {
-        "id": "a",
-        "text": "Action A — comply with signs and signals"
-      },
-      {
-        "id": "b",
-        "text": "Action B — yield where required"
-      },
-      {
-        "id": "c",
-        "text": "Action C — proceed only when safe"
-      },
-      {
-        "id": "d",
-        "text": "Action D — stop if uncertain"
-      }
-    ],
-    "correctAnswer": "a"
-  },
-  {
-    "question": "Official syllabus item 68: choose the safest and most lawful action in the described traffic situation.",
-    "options": [
-      {
-        "id": "a",
-        "text": "Action A — comply with signs and signals"
-      },
-      {
-        "id": "b",
-        "text": "Action B — yield where required"
-      },
-      {
-        "id": "c",
-        "text": "Action C — proceed only when safe"
-      },
-      {
-        "id": "d",
-        "text": "Action D — stop if uncertain"
-      }
-    ],
-    "correctAnswer": "b"
-  },
-  {
-    "question": "Official syllabus item 69: choose the safest and most lawful action in the described traffic situation.",
-    "options": [
-      {
-        "id": "a",
-        "text": "Action A — comply with signs and signals"
-      },
-      {
-        "id": "b",
-        "text": "Action B — yield where required"
-      },
-      {
-        "id": "c",
-        "text": "Action C — proceed only when safe"
-      },
-      {
-        "id": "d",
-        "text": "Action D — stop if uncertain"
-      }
-    ],
-    "correctAnswer": "c"
-  },
-  {
-    "question": "Official syllabus item 70: choose the safest and most lawful action in the described traffic situation.",
     "options": [
       {
         "id": "a",

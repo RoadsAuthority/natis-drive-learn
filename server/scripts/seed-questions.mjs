@@ -46,9 +46,10 @@ if (replace) {
 
 for (const q of questions) {
   const correct = String(q.correctAnswer).toLowerCase();
+  const imageUrl = q.imageUrl ?? q.image_url ?? null;
   await sql`
-    insert into question_bank (question_text, options_json, correct_answer, is_active)
-    values (${q.question}, ${JSON.stringify(q.options)}, ${correct}, true)
+    insert into question_bank (question_text, options_json, correct_answer, image_url, is_active)
+    values (${q.question}, ${JSON.stringify(q.options)}, ${correct}, ${imageUrl}, true)
   `;
 }
 

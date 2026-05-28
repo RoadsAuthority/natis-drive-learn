@@ -13,6 +13,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { addDays, buildScheduleState, deriveReviewFlag, failRebookAfter } from "./lib/testSchedule.js";
+import { TEST_QUESTION_LIMIT, formatQuestionForClient } from "./lib/questions.js";
 
 const serverDir = path.dirname(fileURLToPath(import.meta.url));
 const envCandidates = [path.resolve(serverDir, ".env")];
@@ -736,35 +737,30 @@ app.get("/api/questions/active", authMiddleware, async (req, res) => {
     return res.status(gate.status).json({ message: gate.message });
   }
   const rows = await sql`
-    select question_text, options_json, correct_answer
+    select id, question_text, options_json, image_url
     from question_bank
     where is_active = true
-    order by created_at asc
-    limit 70
+    order by random()
+    limit ${TEST_QUESTION_LIMIT}
   `;
 
   if (!rows.length) {
     return res.json([
       {
+        id: "fallback-1",
         question: "What does a red traffic light mean?",
         options: [
-          { id: "A", text: "Proceed with caution" },
-          { id: "B", text: "Stop" },
-          { id: "C", text: "Speed up" },
-          { id: "D", text: "Pedestrians only" },
+          { id: "a", text: "Proceed with caution" },
+          { id: "b", text: "Stop" },
+          { id: "c", text: "Speed up" },
+          { id: "d", text: "Pedestrians only" },
         ],
-        correctAnswer: "b",
+        imageUrl: "/question-images/stop-sign.svg",
       },
     ]);
   }
 
-  return res.json(
-    rows.map((row) => ({
-      question: row.question_text,
-      options: row.options_json,
-      correctAnswer: String(row.correct_answer ?? "").toLowerCase(),
-    }))
-  );
+  return res.json(rows.map(formatQuestionForClient));
 });
 
 app.post("/api/attempts/mark", authMiddleware, async (req, res) => {
@@ -774,33 +770,40 @@ app.post("/api/attempts/mark", authMiddleware, async (req, res) => {
   }
   const schema = z.object({
     answers: z.record(z.string()),
-    total: z.number().int().positive(),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ message: "Invalid marking payload." });
   }
 
-  const { answers, total } = parsed.data;
+  const { answers } = parsed.data;
+  const questionIds = Object.keys(answers);
+  if (!questionIds.length) {
+    return res.status(400).json({ message: "No answers submitted." });
+  }
+
   const rows = await sql`
-    select correct_answer
+    select id, correct_answer
     from question_bank
-    where is_active = true
-    order by created_at asc
-    limit ${total}
+    where id in ${questionIds}
   `;
 
+  const answerKey = new Map(
+    rows.map((row) => [String(row.id), String(row.correct_answer ?? "").toLowerCase()])
+  );
+
   let score = 0;
-  rows.forEach((row, index) => {
-    const key = String(index);
-    const chosen = String(answers[key] ?? "").toLowerCase();
-    const expected = String(row.correct_answer ?? "").toLowerCase();
-    if (chosen === expected) {
+  for (const questionId of questionIds) {
+    const chosen = String(answers[questionId] ?? "").toLowerCase();
+    const expected = answerKey.get(questionId);
+    if (expected && chosen === expected) {
       score += 1;
     }
-  });
+  }
+
+  const total = questionIds.length;
   const percentage = (score / total) * 100;
-  return res.json({ score, percentage, passed: percentage >= 80 });
+  return res.json({ score, percentage, passed: percentage >= 80, total });
 });
 
 app.post("/api/attempts", authMiddleware, async (req, res) => {

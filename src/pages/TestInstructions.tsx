@@ -48,7 +48,7 @@ const TestInstructions = () => {
                     General guidelines
                   </h2>
                   <ul className="space-y-3 ml-7">
-                    <li>The test consists of <strong>70 multiple choice questions</strong>.</li>
+                    <li>The test consists of <strong>70 multiple choice questions</strong> drawn in random order from the bank.</li>
                     <li>You must score at least <strong>80%</strong> to pass.</li>
                     <li>You have <strong>60 minutes</strong> to complete the test.</li>
                     <li>You may take the test only once every <strong>3 weeks</strong>.</li>
