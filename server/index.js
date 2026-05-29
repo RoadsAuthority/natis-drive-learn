@@ -13,7 +13,7 @@ import path from "node:path";
 import { randomUUID } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { addDays, buildScheduleState, deriveReviewFlag, failRebookAfter } from "./lib/testSchedule.js";
-import { TEST_QUESTION_LIMIT, formatQuestionForClient } from "./lib/questions.js";
+import { TEST_QUESTION_LIMIT, formatQuestionForClient, gradeAnswersByQuestionIds } from "./lib/questions.js";
 
 const serverDir = path.dirname(fileURLToPath(import.meta.url));
 const envCandidates = [path.resolve(serverDir, ".env")];
@@ -777,33 +777,18 @@ app.post("/api/attempts/mark", authMiddleware, async (req, res) => {
   }
 
   const { answers } = parsed.data;
-  const questionIds = Object.keys(answers);
-  if (!questionIds.length) {
+  if (!Object.keys(answers).length) {
     return res.status(400).json({ message: "No answers submitted." });
   }
 
-  const rows = await sql`
-    select id, correct_answer
-    from question_bank
-    where id in ${questionIds}
-  `;
-
-  const answerKey = new Map(
-    rows.map((row) => [String(row.id), String(row.correct_answer ?? "").toLowerCase()])
-  );
-
-  let score = 0;
-  for (const questionId of questionIds) {
-    const chosen = String(answers[questionId] ?? "").toLowerCase();
-    const expected = answerKey.get(questionId);
-    if (expected && chosen === expected) {
-      score += 1;
-    }
+  try {
+    const result = await gradeAnswersByQuestionIds(sql, answers);
+    return res.json(result);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Attempt marking failed:", message);
+    return res.status(500).json({ message: "Could not mark the test. Please try again." });
   }
-
-  const total = questionIds.length;
-  const percentage = (score / total) * 100;
-  return res.json({ score, percentage, passed: percentage >= 80, total });
 });
 
 app.post("/api/attempts", authMiddleware, async (req, res) => {
