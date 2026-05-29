@@ -763,6 +763,90 @@ app.get("/api/questions/active", authMiddleware, async (req, res) => {
   return res.json(rows.map(formatQuestionForClient));
 });
 
+const LIVE_SESSION_STALE_SECONDS = 90;
+
+async function clearStaleTestSessions() {
+  await sql`
+    delete from active_test_sessions
+    where last_heartbeat_at < now() - (${LIVE_SESSION_STALE_SECONDS} * interval '1 second')
+  `;
+}
+
+async function endActiveTestSession(profileId) {
+  await sql`delete from active_test_sessions where profile_id = ${profileId}`;
+}
+
+app.post("/api/test-session/heartbeat", authMiddleware, async (req, res) => {
+  const profileId = req.user.sub;
+  const schema = z.object({
+    currentQuestion: z.number().int().min(1),
+    totalQuestions: z.number().int().positive(),
+    answeredCount: z.number().int().min(0),
+    tabSwitches: z.number().int().min(0),
+    faceMissingEvents: z.number().int().min(0),
+    snapshot: z.string().optional(),
+  });
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ message: "Invalid heartbeat payload." });
+  }
+
+  const { currentQuestion, totalQuestions, answeredCount, tabSwitches, faceMissingEvents, snapshot } = parsed.data;
+  const snapshotData = snapshot?.startsWith("data:image") ? snapshot : null;
+
+  try {
+    await clearStaleTestSessions();
+    await sql`
+      insert into active_test_sessions (
+        profile_id,
+        current_question,
+        total_questions,
+        answered_count,
+        tab_switches,
+        face_missing_events,
+        latest_snapshot_data
+      )
+      values (
+        ${profileId},
+        ${currentQuestion},
+        ${totalQuestions},
+        ${answeredCount},
+        ${tabSwitches},
+        ${faceMissingEvents},
+        ${snapshotData}
+      )
+      on conflict (profile_id) do update set
+        last_heartbeat_at = now(),
+        current_question = ${currentQuestion},
+        total_questions = ${totalQuestions},
+        answered_count = ${answeredCount},
+        tab_switches = ${tabSwitches},
+        face_missing_events = ${faceMissingEvents},
+        latest_snapshot_data = coalesce(${snapshotData}, active_test_sessions.latest_snapshot_data)
+    `;
+    return res.json({ ok: true });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Test session heartbeat failed:", message);
+    return res.status(500).json({
+      message: isMissingSchemaError(error)
+        ? "Live monitoring is unavailable until database migrations are applied."
+        : "Could not update test session.",
+    });
+  }
+});
+
+app.post("/api/test-session/end", authMiddleware, async (req, res) => {
+  try {
+    await endActiveTestSession(req.user.sub);
+    return res.status(204).send();
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Test session end failed:", message);
+    return res.status(500).json({ message: "Could not end test session." });
+  }
+});
+
 app.post("/api/attempts/mark", authMiddleware, async (req, res) => {
   const gate = await assertLearnerTestReady(req.user.sub);
   if (!gate.ok) {
@@ -834,6 +918,7 @@ app.post("/api/attempts", authMiddleware, async (req, res) => {
     insert into attempts (profile_id, score, total, percentage, passed, review_flagged, suspicion_score, proctoring_summary)
     values (${profileId}, ${score}, ${total}, ${percentage}, ${passed}, ${reviewFlagged}, ${suspicionScore}, ${JSON.stringify(proctoringSummary)})
   `;
+  await endActiveTestSession(profileId);
   await sql`
     update profiles
     set
@@ -1001,6 +1086,40 @@ app.get("/api/admin/bookings", authMiddleware, adminMiddleware, async (_req, res
     limit 100
   `;
   return res.json(rows);
+});
+
+app.get("/api/admin/live-tests", authMiddleware, adminMiddleware, async (_req, res) => {
+  try {
+    await clearStaleTestSessions();
+    const rows = await sql`
+      select
+        s.profile_id,
+        s.started_at,
+        s.last_heartbeat_at,
+        s.current_question,
+        s.total_questions,
+        s.answered_count,
+        s.tab_switches,
+        s.face_missing_events,
+        s.latest_snapshot_data,
+        p.email,
+        p.first_name,
+        p.surname
+      from active_test_sessions s
+      join profiles p on p.id = s.profile_id
+      where s.last_heartbeat_at >= now() - (${LIVE_SESSION_STALE_SECONDS} * interval '1 second')
+      order by s.started_at desc
+    `;
+    return res.json(rows);
+  } catch (error) {
+    const message = error instanceof Error ? error.message : String(error);
+    console.error("Admin live tests failed:", message);
+    return res.status(500).json({
+      message: isMissingSchemaError(error)
+        ? "Database schema is out of date. Run npm run db:migrate and restart the API."
+        : "Could not load live test sessions.",
+    });
+  }
 });
 
 app.get("/api/admin/attempts", authMiddleware, adminMiddleware, async (_req, res) => {

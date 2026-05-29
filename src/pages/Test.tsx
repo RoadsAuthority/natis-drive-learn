@@ -5,7 +5,7 @@ import { Card } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { Camera, Clock, ChevronLeft, ChevronRight, Flag } from "lucide-react";
-import { fetchQuestions, markAttempt, saveAttempt } from "@/lib/natisApi";
+import { fetchQuestions, markAttempt, saveAttempt, postTestSessionHeartbeat, endTestSession } from "@/lib/natisApi";
 import { useTestProctoring } from "@/hooks/useTestProctoring";
 import type { TestQuestion } from "@/types/question";
 
@@ -21,6 +21,14 @@ const Test = () => {
   const submittingRef = useRef(false);
   const consentGranted = sessionStorage.getItem("natis-proctoring-consent") === "true";
   const proctoring = useTestProctoring({ enabled: consentGranted, snapshotIntervalMs: 30000 });
+  const proctoringRef = useRef(proctoring);
+  proctoringRef.current = proctoring;
+  const progressRef = useRef({ currentQuestion: 0, answers: {} as Record<string, string>, totalQuestions: 0 });
+  progressRef.current = {
+    currentQuestion,
+    answers,
+    totalQuestions: questions.length,
+  };
 
   useEffect(() => {
     if (!consentGranted) {
@@ -54,6 +62,57 @@ const Test = () => {
     void loadQuestions();
   }, [navigate]);
 
+  useEffect(() => {
+    if (!questions.length || !consentGranted) return;
+
+    let cancelled = false;
+
+    const pulse = async () => {
+      if (cancelled) return;
+      const p = proctoringRef.current;
+      const { currentQuestion: qIndex, answers: currentAnswers, totalQuestions } = progressRef.current;
+      if (!totalQuestions) return;
+
+      const snapshot =
+        p.captureSnapshot() ?? p.snapshots[p.snapshots.length - 1] ?? undefined;
+
+      try {
+        await postTestSessionHeartbeat({
+          currentQuestion: qIndex + 1,
+          totalQuestions,
+          answeredCount: Object.keys(currentAnswers).length,
+          tabSwitches: p.tabSwitches,
+          faceMissingEvents: p.faceMissingEvents,
+          snapshot,
+        });
+      } catch {
+        // Monitoring must not block the test.
+      }
+    };
+
+    const startPulse = () => {
+      void pulse();
+      return window.setInterval(() => void pulse(), 15000);
+    };
+
+    let intervalId: number | undefined;
+    const startWhenReady = window.setInterval(() => {
+      if (proctoringRef.current.active) {
+        window.clearInterval(startWhenReady);
+        intervalId = startPulse();
+      }
+    }, 500);
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(startWhenReady);
+      if (intervalId !== undefined) {
+        window.clearInterval(intervalId);
+      }
+      void endTestSession().catch(() => {});
+    };
+  }, [questions.length, consentGranted]);
+
   const handleSubmit = useCallback(async () => {
     if (submittingRef.current || !questions.length) return;
     submittingRef.current = true;
@@ -81,6 +140,7 @@ const Test = () => {
       );
       sessionStorage.removeItem("natis-proctoring-consent");
       proctoring.stop();
+      await endTestSession().catch(() => {});
       navigate("/results");
     } catch (error) {
       submittingRef.current = false;

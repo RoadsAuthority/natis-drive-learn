@@ -5,20 +5,18 @@ import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { AlertCircle, Camera, CheckCircle2, Clock, FileText } from "lucide-react";
-import SnellenScreening from "@/components/vision/SnellenScreening";
 
-type Step = "instructions" | "consent" | "vision" | "ready";
+type Step = "instructions" | "consent" | "ready";
 
 const TestInstructions = () => {
   const navigate = useNavigate();
   const [step, setStep] = useState<Step>("instructions");
   const [agreed, setAgreed] = useState(false);
   const [monitoringConsent, setMonitoringConsent] = useState(false);
-  const [visionPassed, setVisionPassed] = useState(false);
 
   const handleStartTest = () => {
-    if (!agreed || !monitoringConsent || !visionPassed) {
-      toast.error("Complete instructions, webcam consent, and the quick vision check first.");
+    if (!agreed || !monitoringConsent) {
+      toast.error("Read the instructions and consent to webcam monitoring first.");
       return;
     }
     sessionStorage.setItem("natis-proctoring-consent", "true");
@@ -48,12 +46,26 @@ const TestInstructions = () => {
                     General guidelines
                   </h2>
                   <ul className="space-y-3 ml-7">
-                    <li>The test consists of <strong>70 multiple choice questions</strong> drawn in random order from the bank.</li>
-                    <li>You must score at least <strong>80%</strong> to pass.</li>
-                    <li>You have <strong>60 minutes</strong> to complete the test.</li>
-                    <li>You may take the test only once every <strong>3 weeks</strong>.</li>
-                    <li>If you fail, you must wait <strong>5 minutes</strong> before trying again (demo setting).</li>
-                    <li>Your webcam stays active during the test. Tab switches and missing face events are flagged for review.</li>
+                    <li>
+                      The test consists of <strong>70 multiple choice questions</strong> drawn in random order from
+                      the bank.
+                    </li>
+                    <li>
+                      You must score at least <strong>80%</strong> to pass.
+                    </li>
+                    <li>
+                      You have <strong>60 minutes</strong> to complete the test.
+                    </li>
+                    <li>
+                      You may take the test only once every <strong>3 weeks</strong>.
+                    </li>
+                    <li>
+                      If you fail, you must wait <strong>5 minutes</strong> before trying again (demo setting).
+                    </li>
+                    <li>
+                      Your webcam stays active during the test. Verifiers can see live progress. Tab switches and
+                      missing face events are flagged for review.
+                    </li>
                   </ul>
                 </div>
                 <div className="bg-accent/30 border border-accent-foreground/20 rounded-lg p-4 flex items-start gap-3">
@@ -82,8 +94,8 @@ const TestInstructions = () => {
                 Webcam monitoring consent
               </h2>
               <p className="text-sm text-muted-foreground">
-                The system records periodic face snapshots and monitors tab visibility during the theory test. Suspicious
-                activity is flagged for verifier review instead of blocking your submission.
+                The system shares periodic webcam snapshots with verifiers while you take the test, and monitors tab
+                visibility. Suspicious activity is flagged for review instead of blocking your submission.
               </p>
               <div className="flex items-center space-x-2 p-4 bg-muted rounded-lg">
                 <Checkbox
@@ -99,38 +111,10 @@ const TestInstructions = () => {
                 <Button variant="outline" onClick={() => setStep("instructions")}>
                   Back
                 </Button>
-                <Button onClick={() => setStep("vision")} disabled={!monitoringConsent}>
-                  Continue to quick vision check
+                <Button onClick={() => setStep("ready")} disabled={!monitoringConsent}>
+                  Continue
                 </Button>
               </div>
-            </div>
-          ) : null}
-
-          {step === "vision" ? (
-            <div className="space-y-6">
-              <h2 className="text-xl font-semibold flex items-center gap-2">
-                <CheckCircle2 className="h-5 w-5 text-primary" />
-                Quick vision screening
-              </h2>
-              <p className="text-sm text-muted-foreground">
-                Type the letters on each line within five seconds before the monitored theory test begins.
-              </p>
-              <SnellenScreening
-                lineCount={3}
-                secondsPerLine={5}
-                passThreshold={0.67}
-                onComplete={(passed) => {
-                  setVisionPassed(passed);
-                  if (!passed) {
-                    toast.error("Quick vision check failed. Try again before starting the test.");
-                    return;
-                  }
-                  setStep("ready");
-                }}
-              />
-              <Button variant="outline" onClick={() => setStep("consent")}>
-                Back
-              </Button>
             </div>
           ) : null}
 

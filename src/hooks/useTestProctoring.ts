@@ -110,6 +110,12 @@ export function useTestProctoring({ enabled, snapshotIntervalMs = 30000 }: Optio
 
   useEffect(() => () => stop(), [stop]);
 
+  const captureSnapshot = useCallback(() => {
+    const video = videoRef.current;
+    if (!video || !active) return null;
+    return captureFrame(video);
+  }, [active]);
+
   const summary: ProctoringSummary = {
     tabSwitches,
     faceMissingEvents,
@@ -124,6 +130,7 @@ export function useTestProctoring({ enabled, snapshotIntervalMs = 30000 }: Optio
     faceMissingEvents,
     snapshots,
     summary,
+    captureSnapshot,
     start,
     stop,
   };

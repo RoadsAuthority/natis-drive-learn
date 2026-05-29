@@ -105,6 +105,30 @@ export async function saveAttempt(
   });
 }
 
+export async function postTestSessionHeartbeat(payload: {
+  currentQuestion: number;
+  totalQuestions: number;
+  answeredCount: number;
+  tabSwitches: number;
+  faceMissingEvents: number;
+  snapshot?: string;
+}) {
+  const token = await withToken();
+  await apiRequest("/api/test-session/heartbeat", {
+    method: "POST",
+    token,
+    body: payload,
+  });
+}
+
+export async function endTestSession() {
+  const token = await withToken();
+  await apiRequest("/api/test-session/end", {
+    method: "POST",
+    token,
+  });
+}
+
 export async function requestResultDocument(results: unknown) {
   const token = await withToken();
   await apiRequest("/api/results/document", {

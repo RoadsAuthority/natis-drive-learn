@@ -70,6 +70,28 @@ export async function fetchAdminBookings() {
   return apiRequest<unknown[]>("/api/admin/bookings", { token });
 }
 
+export type LiveTestSession = {
+  profile_id: string;
+  started_at: string;
+  last_heartbeat_at: string;
+  current_question: number;
+  total_questions: number;
+  answered_count: number;
+  tab_switches: number;
+  face_missing_events: number;
+  latest_snapshot_data: string | null;
+  email: string;
+  first_name: string | null;
+  surname: string | null;
+};
+
+export async function fetchAdminLiveTests(): Promise<LiveTestSession[] | null> {
+  if (!isApiConfigured()) return null;
+  const token = await adminToken();
+  if (!token) return null;
+  return apiRequest<LiveTestSession[]>("/api/admin/live-tests", { token });
+}
+
 export async function fetchAdminAttempts() {
   if (!isApiConfigured()) return null;
   const token = await adminToken();

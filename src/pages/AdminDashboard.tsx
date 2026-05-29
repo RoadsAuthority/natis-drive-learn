@@ -15,15 +15,17 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Users, FileText, BarChart3, ShieldCheck, Calendar, RefreshCw, LogOut } from "lucide-react";
+import { Users, FileText, BarChart3, ShieldCheck, Calendar, RefreshCw, LogOut, Radio } from "lucide-react";
 import {
   fetchAdminAudit,
   fetchAdminAttempts,
   fetchAdminBookings,
+  fetchAdminLiveTests,
   fetchAdminStats,
   fetchVerificationQueue,
   postVerificationDecision,
   type AdminStats,
+  type LiveTestSession,
   type VerificationQueueRow,
 } from "@/lib/adminApi";
 import { useAuthContext } from "@/components/auth/AuthProvider";
@@ -36,6 +38,7 @@ const AdminDashboard = () => {
   const [queue, setQueue] = useState<VerificationQueueRow[]>([]);
   const [bookings, setBookings] = useState<Record<string, unknown>[]>([]);
   const [attempts, setAttempts] = useState<Record<string, unknown>[]>([]);
+  const [liveTests, setLiveTests] = useState<LiveTestSession[]>([]);
   const [audit, setAudit] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
   const [rejectTarget, setRejectTarget] = useState<VerificationQueueRow | null>(null);
@@ -68,6 +71,21 @@ const AdminDashboard = () => {
   useEffect(() => {
     void loadAll();
   }, [loadAll]);
+
+  const refreshLiveTests = useCallback(async () => {
+    try {
+      const sessions = await fetchAdminLiveTests();
+      setLiveTests(sessions ?? []);
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  }, []);
+
+  useEffect(() => {
+    void refreshLiveTests();
+    const interval = window.setInterval(() => void refreshLiveTests(), 5000);
+    return () => window.clearInterval(interval);
+  }, [refreshLiveTests]);
 
   const approveCandidate = async (profileId: string) => {
     try {
@@ -178,13 +196,86 @@ const AdminDashboard = () => {
           </Card>
         </div>
 
-        <Tabs defaultValue="verification" className="space-y-4">
-          <TabsList className="grid w-full max-w-3xl grid-cols-4">
+        <Tabs defaultValue="live" className="space-y-4">
+          <TabsList className="grid w-full max-w-4xl grid-cols-5">
+            <TabsTrigger value="live">Live tests</TabsTrigger>
             <TabsTrigger value="verification">Verification</TabsTrigger>
             <TabsTrigger value="bookings">Bookings</TabsTrigger>
             <TabsTrigger value="attempts">Attempts</TabsTrigger>
             <TabsTrigger value="audit">Audit</TabsTrigger>
           </TabsList>
+          <TabsContent value="live">
+            <Card className="p-6 space-y-4">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <h2 className="text-xl font-semibold flex items-center gap-2">
+                  <Radio className="h-5 w-5 text-destructive animate-pulse" />
+                  Candidates taking the test now
+                </h2>
+                <p className="text-sm text-muted-foreground">Refreshes every 5 seconds</p>
+              </div>
+              {liveTests.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No active test sessions right now.</p>
+              ) : (
+                <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                  {liveTests.map((session) => {
+                    const name = `${(session.first_name ?? "").trim()} ${(session.surname ?? "").trim()}`.trim();
+                    const progress =
+                      session.total_questions > 0
+                        ? Math.round((session.current_question / session.total_questions) * 100)
+                        : 0;
+                    const flagged = session.tab_switches > 0 || session.face_missing_events > 0;
+
+                    return (
+                      <Card key={session.profile_id} className="overflow-hidden border-2 p-0">
+                        <div className="aspect-video bg-muted flex items-center justify-center">
+                          {session.latest_snapshot_data ? (
+                            <img
+                              src={session.latest_snapshot_data}
+                              alt={`Webcam feed for ${name || session.email}`}
+                              className="h-full w-full object-cover"
+                            />
+                          ) : (
+                            <p className="text-sm text-muted-foreground px-4 text-center">
+                              Waiting for webcam snapshot…
+                            </p>
+                          )}
+                        </div>
+                        <div className="space-y-3 p-4">
+                          <div>
+                            <p className="font-medium">{name || "Candidate"}</p>
+                            <p className="text-xs text-muted-foreground">{session.email}</p>
+                          </div>
+                          <div className="text-sm">
+                            Question {session.current_question} of {session.total_questions} ·{" "}
+                            {session.answered_count} answered
+                          </div>
+                          <div className="h-2 w-full rounded-full bg-muted overflow-hidden">
+                            <div className="h-full bg-primary transition-all" style={{ width: `${progress}%` }} />
+                          </div>
+                          <div className="flex flex-wrap gap-2 text-xs">
+                            {flagged ? (
+                              <Badge variant="destructive">Review signals</Badge>
+                            ) : (
+                              <Badge variant="secondary">Monitoring OK</Badge>
+                            )}
+                            {session.tab_switches > 0 ? (
+                              <Badge variant="outline">Tab switches: {session.tab_switches}</Badge>
+                            ) : null}
+                            {session.face_missing_events > 0 ? (
+                              <Badge variant="outline">Face missing: {session.face_missing_events}</Badge>
+                            ) : null}
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Started {new Date(session.started_at).toLocaleTimeString()}
+                          </p>
+                        </div>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </Card>
+          </TabsContent>
           <TabsContent value="verification">
             <Card className="p-6 space-y-3">
               <h2 className="text-xl font-semibold flex items-center gap-2">
