@@ -764,6 +764,12 @@ app.get("/api/questions/active", authMiddleware, async (req, res) => {
 });
 
 const LIVE_SESSION_STALE_SECONDS = 90;
+const TEST_DURATION_SECONDS = 60 * 60;
+
+function testTimeRemainingSeconds(startedAt) {
+  const elapsed = (Date.now() - new Date(startedAt).getTime()) / 1000;
+  return Math.max(0, Math.ceil(TEST_DURATION_SECONDS - elapsed));
+}
 
 async function clearStaleTestSessions() {
   await sql`
@@ -796,7 +802,7 @@ app.post("/api/test-session/heartbeat", authMiddleware, async (req, res) => {
 
   try {
     await clearStaleTestSessions();
-    await sql`
+    const rows = await sql`
       insert into active_test_sessions (
         profile_id,
         current_question,
@@ -823,8 +829,14 @@ app.post("/api/test-session/heartbeat", authMiddleware, async (req, res) => {
         tab_switches = ${tabSwitches},
         face_missing_events = ${faceMissingEvents},
         latest_snapshot_data = coalesce(${snapshotData}, active_test_sessions.latest_snapshot_data)
+      returning started_at
     `;
-    return res.json({ ok: true });
+    const startedAt = rows[0]?.started_at;
+    return res.json({
+      ok: true,
+      startedAt: startedAt ? new Date(startedAt).toISOString() : null,
+      timeRemainingSeconds: startedAt ? testTimeRemainingSeconds(startedAt) : TEST_DURATION_SECONDS,
+    });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
     console.error("Test session heartbeat failed:", message);

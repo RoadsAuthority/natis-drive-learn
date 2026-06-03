@@ -14,6 +14,7 @@ const Test = () => {
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [timeRemaining, setTimeRemaining] = useState(3600);
+  const [timerSynced, setTimerSynced] = useState(false);
   const [flagged, setFlagged] = useState<Set<number>>(new Set());
   const [questions, setQuestions] = useState<TestQuestion[]>([]);
   const [loadingQuestions, setLoadingQuestions] = useState(true);
@@ -77,7 +78,7 @@ const Test = () => {
         p.captureSnapshot() ?? p.snapshots[p.snapshots.length - 1] ?? undefined;
 
       try {
-        await postTestSessionHeartbeat({
+        const session = await postTestSessionHeartbeat({
           currentQuestion: qIndex + 1,
           totalQuestions,
           answeredCount: Object.keys(currentAnswers).length,
@@ -85,6 +86,10 @@ const Test = () => {
           faceMissingEvents: p.faceMissingEvents,
           snapshot,
         });
+        if (session.timeRemainingSeconds != null) {
+          setTimeRemaining(session.timeRemainingSeconds);
+          setTimerSynced(true);
+        }
       } catch {
         // Monitoring must not block the test.
       }
@@ -150,6 +155,8 @@ const Test = () => {
   }, [answers, navigate, proctoring, questions]);
 
   useEffect(() => {
+    if (!timerSynced) return;
+
     const timer = window.setInterval(() => {
       setTimeRemaining((prev) => {
         if (prev <= 0) {
@@ -160,7 +167,7 @@ const Test = () => {
       });
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [handleSubmit]);
+  }, [handleSubmit, timerSynced]);
 
   const formatTime = (seconds: number) => {
     const mins = Math.floor(seconds / 60);

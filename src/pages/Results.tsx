@@ -16,15 +16,7 @@ type TestResults = {
   licenseCollectionFrom?: string | null;
 };
 
-function formatDate(value?: string | null) {
-  if (!value) return null;
-  return new Date(value).toLocaleString("en-GB", {
-    day: "numeric",
-    month: "short",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
+import { formatDateTime } from "@/lib/formatDate";
 
 const Results = () => {
   const navigate = useNavigate();
@@ -90,7 +82,7 @@ const Results = () => {
                 <p className="text-success font-medium">Your certificate of achievement is ready.</p>
                 {results.licenseCollectionFrom ? (
                   <p className="text-sm text-success mt-2">
-                    You may collect your learner&apos;s licence from {formatDate(results.licenseCollectionFrom)}.
+                    You may collect your learner&apos;s licence from {formatDateTime(results.licenseCollectionFrom)}.
                   </p>
                 ) : null}
               </div>
@@ -117,7 +109,7 @@ const Results = () => {
                 </p>
                 {results.nextBookingEligibleAt ? (
                   <p className="text-sm text-destructive mt-2">
-                    Eligible again from: {formatDate(results.nextBookingEligibleAt)}.
+                    Eligible again from: {formatDateTime(results.nextBookingEligibleAt)}.
                   </p>
                 ) : null}
               </div>

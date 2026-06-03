@@ -8,3 +8,16 @@ export function formatDateShort(value?: string | Date | null) {
     day: "numeric",
   });
 }
+
+export function formatDateTime(value?: string | Date | null) {
+  if (!value) return null;
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return date.toLocaleString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+}

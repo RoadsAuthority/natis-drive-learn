@@ -114,7 +114,11 @@ export async function postTestSessionHeartbeat(payload: {
   snapshot?: string;
 }) {
   const token = await withToken();
-  await apiRequest("/api/test-session/heartbeat", {
+  return apiRequest<{
+    ok: boolean;
+    startedAt: string | null;
+    timeRemainingSeconds: number;
+  }>("/api/test-session/heartbeat", {
     method: "POST",
     token,
     body: payload,
