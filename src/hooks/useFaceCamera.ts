@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+export type CameraErrorCode = "unsupported" | "preview" | "blocked" | "missing" | "failed" | "video";
+
 function captureFrame(video: HTMLVideoElement) {
   const canvas = document.createElement("canvas");
   canvas.width = video.videoWidth || 640;
@@ -15,7 +17,7 @@ export function useFaceCamera() {
   const streamRef = useRef<MediaStream | null>(null);
   const [capturing, setCapturing] = useState(false);
   const [ready, setReady] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<CameraErrorCode | null>(null);
 
   const stop = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -41,20 +43,19 @@ export function useFaceCamera() {
         video.removeEventListener("loadedmetadata", onReady);
         resolve();
       }
-      video.onerror = () => reject(new Error("Video failed to load."));
+      video.onerror = () => reject(new Error("video"));
     });
     await video.play();
     setReady(video.videoWidth > 0);
     return video.videoWidth > 0;
   }, []);
 
-  const start = useCallback(async (): Promise<string | null> => {
+  const start = useCallback(async (): Promise<CameraErrorCode | null> => {
     setError(null);
     setReady(false);
     if (!navigator.mediaDevices?.getUserMedia) {
-      const message = "This browser does not support the camera. Upload a face photo instead.";
-      setError(message);
-      return message;
+      setError("unsupported");
+      return "unsupported";
     }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -69,22 +70,23 @@ export function useFaceCamera() {
       setCapturing(true);
       const attached = await attachStream(stream);
       if (!attached) {
-        const message = "Camera started but preview is not ready. Try again or upload a photo.";
-        setError(message);
-        return message;
+        setError("preview");
+        return "preview";
       }
       return null;
     } catch (err) {
-      const name = err instanceof DOMException ? err.name : "";
-      let message = "Could not start the camera. Upload a face photo instead.";
+      const name = err instanceof DOMException ? err.name : err instanceof Error ? err.message : "";
+      let code: CameraErrorCode = "failed";
       if (name === "NotAllowedError" || name === "PermissionDeniedError") {
-        message = "Camera blocked. Allow camera access in your browser settings, or upload a photo.";
+        code = "blocked";
       } else if (name === "NotFoundError") {
-        message = "No camera found. Upload a face photo instead.";
+        code = "missing";
+      } else if (name === "video") {
+        code = "video";
       }
-      setError(message);
+      setError(code);
       stop();
-      return message;
+      return code;
     }
   }, [attachStream, stop]);
 

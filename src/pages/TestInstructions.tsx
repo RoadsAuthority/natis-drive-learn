@@ -5,19 +5,26 @@ import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { AlertCircle, Camera, CheckCircle2, Clock, FileText } from "lucide-react";
+import { useLanguage } from "@/i18n/LanguageProvider";
 
 type Step = "instructions" | "consent" | "ready";
 
 const TestInstructions = () => {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [step, setStep] = useState<Step>("instructions");
   const [agreed, setAgreed] = useState(false);
   const [monitoringConsent, setMonitoringConsent] = useState(false);
 
-  const handleStartTest = () => {
+  const handleStartTest = async () => {
     if (!agreed || !monitoringConsent) {
-      toast.error("Read the instructions and consent to webcam monitoring first.");
+      toast.error(t("instructions.needConsent"));
       return;
+    }
+    try {
+      await document.documentElement.requestFullscreen();
+    } catch {
+      // Fullscreen is best-effort; tab visibility is still monitored.
     }
     sessionStorage.setItem("natis-proctoring-consent", "true");
     navigate("/test");
@@ -31,58 +38,54 @@ const TestInstructions = () => {
             <div className="p-3 rounded-lg bg-primary/10">
               <FileText className="h-6 w-6 text-primary" />
             </div>
-            <h1 className="text-3xl font-bold text-foreground">Test instructions</h1>
+            <h1 className="text-3xl font-bold text-foreground">{t("instructions.title")}</h1>
           </div>
 
           {step === "instructions" ? (
             <>
-              <p className="text-lg text-muted-foreground mb-8">
-                Read the following carefully before you begin your monitored learner theory test.
-              </p>
+              <p className="text-lg text-muted-foreground mb-8">{t("instructions.intro")}</p>
               <div className="space-y-6 mb-8">
                 <div>
                   <h2 className="text-xl font-semibold mb-4 flex items-center gap-2">
                     <AlertCircle className="h-5 w-5 text-primary" />
-                    General guidelines
+                    {t("instructions.guidelines")}
                   </h2>
                   <ul className="space-y-3 ml-7">
                     <li>
-                      The test consists of <strong>70 multiple choice questions</strong> drawn in random order from
-                      the bank.
+                      {t("instructions.q1")}
                     </li>
                     <li>
-                      You must score at least <strong>80%</strong> to pass.
+                      {t("instructions.q2")}
                     </li>
                     <li>
-                      You have <strong>60 minutes</strong> to complete the test.
+                      {t("instructions.q3")}
                     </li>
                     <li>
-                      You may take the test only once every <strong>3 weeks</strong>.
+                      {t("instructions.q4")}
                     </li>
                     <li>
-                      If you fail, you must wait <strong>5 minutes</strong> before trying again (demo setting).
+                      {t("instructions.q5")}
                     </li>
                     <li>
-                      Your webcam stays active during the test. Verifiers can see live progress. Tab switches and
-                      missing face events are flagged for review.
+                      {t("instructions.q6")}
                     </li>
                   </ul>
                 </div>
                 <div className="bg-accent/30 border border-accent-foreground/20 rounded-lg p-4 flex items-start gap-3">
                   <Clock className="h-5 w-5 text-primary mt-0.5" />
                   <p className="text-sm">
-                    <strong>Time management tip:</strong> You have roughly 51 seconds per question.
+                    <strong>{t("instructions.tip")}</strong> {t("instructions.tipBody")}
                   </p>
                 </div>
               </div>
               <div className="flex items-center space-x-2 mb-6 p-4 bg-muted rounded-lg">
                 <Checkbox id="agree" checked={agreed} onCheckedChange={(checked) => setAgreed(checked === true)} />
                 <label htmlFor="agree" className="text-sm font-medium cursor-pointer">
-                  I have read and understood all the instructions
+                  {t("instructions.agree")}
                 </label>
               </div>
               <Button onClick={() => setStep("consent")} size="lg" className="w-full text-lg" disabled={!agreed}>
-                Continue to webcam consent
+                {t("instructions.toConsent")}
               </Button>
             </>
           ) : null}
@@ -91,11 +94,10 @@ const TestInstructions = () => {
             <div className="space-y-6">
               <h2 className="text-xl font-semibold flex items-center gap-2">
                 <Camera className="h-5 w-5 text-primary" />
-                Webcam monitoring consent
+                {t("instructions.consentTitle")}
               </h2>
               <p className="text-sm text-muted-foreground">
-                The system shares periodic webcam snapshots with verifiers while you take the test, and monitors tab
-                visibility. Suspicious activity is flagged for review instead of blocking your submission.
+                {t("instructions.consentBody")}
               </p>
               <div className="flex items-center space-x-2 p-4 bg-muted rounded-lg">
                 <Checkbox
@@ -104,15 +106,15 @@ const TestInstructions = () => {
                   onCheckedChange={(checked) => setMonitoringConsent(checked === true)}
                 />
                 <label htmlFor="monitoring-consent" className="text-sm font-medium cursor-pointer">
-                  I consent to webcam monitoring for this test session
+                  {t("instructions.consentCheck")}
                 </label>
               </div>
               <div className="flex gap-3">
                 <Button variant="outline" onClick={() => setStep("instructions")}>
-                  Back
+                  {t("instructions.back")}
                 </Button>
                 <Button onClick={() => setStep("ready")} disabled={!monitoringConsent}>
-                  Continue
+                  {t("instructions.continue")}
                 </Button>
               </div>
             </div>
@@ -121,9 +123,9 @@ const TestInstructions = () => {
           {step === "ready" ? (
             <div className="space-y-6 text-center">
               <CheckCircle2 className="mx-auto h-12 w-12 text-success" />
-              <p className="text-lg">You are cleared to start the monitored theory test.</p>
-              <Button onClick={handleStartTest} size="lg" className="w-full text-lg">
-                Start test
+              <p className="text-lg">{t("instructions.ready")}</p>
+              <Button onClick={() => void handleStartTest()} size="lg" className="w-full text-lg">
+                {t("instructions.start")}
               </Button>
             </div>
           ) : null}

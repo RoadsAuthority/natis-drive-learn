@@ -7,14 +7,18 @@ import { Badge } from "@/components/ui/badge";
 import { useAuthContext } from "@/components/auth/AuthProvider";
 import { useEligibility } from "@/hooks/useEligibility";
 import { formatDateShort } from "@/lib/formatDate";
+import { useLanguage } from "@/i18n/LanguageProvider";
 
-function statusLabel(status: string) {
-  return status.replace(/_/g, " ");
+function statusLabel(status: string, t: (path: string) => string) {
+  const key = `status.${status}`;
+  const translated = t(key);
+  return translated === key ? status.replace(/_/g, " ") : translated;
 }
 
 export default function CandidateProfile() {
   const navigate = useNavigate();
   const { user, profile, logout, refresh } = useAuthContext();
+  const { locale, t } = useLanguage();
   const { testPassed, testAttempted, profileVerified, eyeTestComplete, paymentComplete, testSchedule } =
     useEligibility();
 
@@ -35,62 +39,62 @@ export default function CandidateProfile() {
         <div className="flex flex-wrap items-center justify-between gap-4">
           <Button variant="ghost" size="sm" onClick={() => navigate("/portal")}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            Portal
+            {t("profile.back")}
           </Button>
           <Button variant="ghost" size="sm" onClick={() => void handleLogout()}>
             <LogOut className="mr-2 h-4 w-4" />
-            Sign out
+            {t("profile.signOut")}
           </Button>
         </div>
 
         <Card className="p-6 space-y-4">
           <div className="flex items-start justify-between gap-4">
             <div>
-              <h1 className="text-2xl font-bold">My profile</h1>
-              <p className="text-sm text-muted-foreground">Your learner licence application details</p>
+              <h1 className="text-2xl font-bold">{t("profile.title")}</h1>
+              <p className="text-sm text-muted-foreground">{t("profile.subtitle")}</p>
             </div>
             {testPassed ? (
-              <Badge className="bg-success text-success-foreground">Theory test passed</Badge>
+              <Badge className="bg-success text-success-foreground">{t("profile.passed")}</Badge>
             ) : testAttempted ? (
-              <Badge variant="secondary">Test attempted</Badge>
+              <Badge variant="secondary">{t("profile.attempted")}</Badge>
             ) : (
-              <Badge variant="outline">In progress</Badge>
+              <Badge variant="outline">{t("profile.inProgress")}</Badge>
             )}
           </div>
 
           <dl className="grid gap-3 sm:grid-cols-2 text-sm">
             <div>
-              <dt className="text-muted-foreground">Full name</dt>
+              <dt className="text-muted-foreground">{t("profile.fullName")}</dt>
               <dd className="font-medium">{fullName}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Email</dt>
+              <dt className="text-muted-foreground">{t("profile.email")}</dt>
               <dd className="font-medium">{profile?.email ?? user?.email ?? "—"}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">ID number</dt>
+              <dt className="text-muted-foreground">{t("profile.idNumber")}</dt>
               <dd className="font-medium">{profile?.id_number ?? "—"}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Licence code</dt>
+              <dt className="text-muted-foreground">{t("profile.licenceCode")}</dt>
               <dd className="font-medium">{profile?.licence_code ?? "—"}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Documents</dt>
-              <dd className="font-medium capitalize">{statusLabel(profile?.verification_status ?? "pending")}</dd>
+              <dt className="text-muted-foreground">{t("profile.documents")}</dt>
+              <dd className="font-medium capitalize">{statusLabel(profile?.verification_status ?? "pending", t)}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Vision screening</dt>
-              <dd className="font-medium capitalize">{statusLabel(profile?.eye_test_status ?? "pending")}</dd>
+              <dt className="text-muted-foreground">{t("profile.vision")}</dt>
+              <dd className="font-medium capitalize">{statusLabel(profile?.eye_test_status ?? "pending", t)}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Payment</dt>
-              <dd className="font-medium capitalize">{statusLabel(profile?.payment_status ?? "pending")}</dd>
+              <dt className="text-muted-foreground">{t("profile.payment")}</dt>
+              <dd className="font-medium capitalize">{statusLabel(profile?.payment_status ?? "pending", t)}</dd>
             </div>
             <div>
-              <dt className="text-muted-foreground">Theory test</dt>
+              <dt className="text-muted-foreground">{t("profile.theory")}</dt>
               <dd className="font-medium">
-                {testPassed ? "Passed" : testAttempted ? "Not passed" : "Not taken"}
+                {testPassed ? t("portal.passed") : testAttempted ? t("profile.notPassed") : t("profile.notTaken")}
               </dd>
             </div>
           </dl>
@@ -99,7 +103,7 @@ export default function CandidateProfile() {
             <Card className="p-4 bg-muted/50 text-sm">
               <p className="font-medium flex items-center gap-2">
                 <FileCheck2 className="h-4 w-4" />
-                Latest test result
+                {t("profile.latest")}
               </p>
               <p className="mt-1">
                 {testSchedule.last_attempt_score}/{testSchedule.last_attempt_total}
@@ -107,7 +111,7 @@ export default function CandidateProfile() {
                   ? ` (${Number(testSchedule.last_attempt_percentage).toFixed(1)}%)`
                   : ""}
                 {testSchedule.last_attempt_at
-                  ? ` · ${formatDateShort(testSchedule.last_attempt_at) ?? ""}`
+                  ? ` · ${formatDateShort(testSchedule.last_attempt_at, locale) ?? ""}`
                   : ""}
               </p>
             </Card>
@@ -115,8 +119,9 @@ export default function CandidateProfile() {
 
           {testSchedule?.license_collection_from ? (
             <p className="text-sm rounded-md border border-success/20 bg-success/5 p-3">
-              Collect your learner&apos;s licence from{" "}
-              <strong>{formatDateShort(testSchedule.license_collection_from) ?? "—"}</strong>.
+              {t("profile.collectFrom", {
+                date: formatDateShort(testSchedule.license_collection_from, locale) ?? "—",
+              })}
             </p>
           ) : null}
 
@@ -130,26 +135,26 @@ export default function CandidateProfile() {
             {testPassed ? (
               <Button onClick={() => navigate("/certificate")}>
                 <Award className="mr-2 h-4 w-4" />
-                View certificate
+                {t("profile.viewCertificate")}
               </Button>
             ) : null}
             {!profileVerified ? (
               <Button variant="outline" onClick={() => navigate("/profile-verification")}>
-                Complete verification
+                {t("profile.completeVerification")}
               </Button>
             ) : null}
             {profileVerified && !eyeTestComplete ? (
               <Button variant="outline" onClick={() => navigate("/eye-test")}>
-                Vision screening
+                {t("profile.visionAction")}
               </Button>
             ) : null}
             {profileVerified && eyeTestComplete && !paymentComplete ? (
               <Button variant="outline" onClick={() => navigate("/booking")}>
-                Book & pay
+                {t("profile.bookPay")}
               </Button>
             ) : null}
             <Button variant="outline" onClick={() => navigate("/portal")}>
-              Learning journey
+              {t("profile.journey")}
             </Button>
           </div>
         </Card>

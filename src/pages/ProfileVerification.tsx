@@ -8,11 +8,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { submitProfileVerification } from "@/lib/natisApi";
 import { useAuthContext } from "@/components/auth/AuthProvider";
-import { useFaceCamera } from "@/hooks/useFaceCamera";
+import { useFaceCamera, type CameraErrorCode } from "@/hooks/useFaceCamera";
+import { useLanguage } from "@/i18n/LanguageProvider";
 
 export default function ProfileVerification() {
   const navigate = useNavigate();
   const { refresh } = useAuthContext();
+  const { t } = useLanguage();
   const { videoRef, capturing, ready, error: cameraError, start, capture } = useFaceCamera();
   const [formData, setFormData] = useState({
     firstName: "",
@@ -28,7 +30,7 @@ export default function ProfileVerification() {
   const onFacePhotoFile = (file: File | null) => {
     if (!file) return;
     if (!file.type.startsWith("image/")) {
-      toast.error("Please choose an image file for your face photo.");
+      toast.error(t("verify.imageOnly"));
       return;
     }
     const reader = new FileReader();
@@ -36,7 +38,7 @@ export default function ProfileVerification() {
       const result = reader.result;
       if (typeof result === "string") {
         setFaceCapture(result);
-        toast.success("Face photo ready.");
+        toast.success(t("verify.faceReady"));
       }
     };
     reader.readAsDataURL(file);
@@ -45,32 +47,36 @@ export default function ProfileVerification() {
   const handleStartCamera = async () => {
     const message = await start();
     if (message) {
-      toast.error(message);
+      toast.error(t(`camera.${message}`));
     }
   };
 
   const handleCaptureFace = () => {
     const frame = capture();
     if (!frame) {
-      toast.error(ready ? "Could not capture photo. Try again." : "Wait for the camera preview to appear.");
+      toast.error(ready ? t("verify.captureFailed") : t("verify.waitPreview"));
       return;
     }
     setFaceCapture(frame);
-    toast.success("Face photo captured.");
+    toast.success(t("verify.captured"));
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!formData.firstName.trim() || !formData.surname.trim() || !formData.idNumber.trim()) {
-      toast.error("Fill in first name, surname, and ID number.");
+      toast.error(t("verify.fillRequired"));
+      return;
+    }
+    if (!/^\d+$/.test(formData.idNumber.trim())) {
+      toast.error(t("verify.idDigitsOnly"));
       return;
     }
     if (!idCopy && !passportCopy) {
-      toast.error("Upload an ID copy or passport.");
+      toast.error(t("verify.needId"));
       return;
     }
     if (!faceCapture) {
-      toast.error("Capture or upload your face photo before submitting.");
+      toast.error(t("verify.needFace"));
       return;
     }
 
@@ -87,10 +93,10 @@ export default function ProfileVerification() {
       await submitProfileVerification(payload);
       localStorage.setItem("profile", JSON.stringify(formData));
       await refresh();
-      toast.success("Verification submitted. Admin review is required.");
+      toast.success(t("verify.submitted"));
       navigate("/portal");
     } catch (error) {
-      toast.error((error as Error).message || "Failed to submit verification.");
+      toast.error((error as Error).message || t("verify.submitFailed"));
     } finally {
       setSubmitting(false);
     }
@@ -100,11 +106,11 @@ export default function ProfileVerification() {
     <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background p-6">
       <div className="mx-auto max-w-3xl">
         <Card className="p-6 space-y-6">
-          <h1 className="text-2xl font-bold">Profile Verification</h1>
+          <h1 className="text-2xl font-bold">{t("verify.title")}</h1>
           <form className="space-y-4" onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="firstName">First Name</Label>
+                <Label htmlFor="firstName">{t("verify.firstName")}</Label>
                 <Input
                   id="firstName"
                   value={formData.firstName}
@@ -112,7 +118,7 @@ export default function ProfileVerification() {
                 />
               </div>
               <div>
-                <Label htmlFor="surname">Surname</Label>
+                <Label htmlFor="surname">{t("verify.surname")}</Label>
                 <Input
                   id="surname"
                   value={formData.surname}
@@ -122,15 +128,16 @@ export default function ProfileVerification() {
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="idNumber">ID Number</Label>
+                <Label htmlFor="idNumber">{t("verify.idNumber")}</Label>
                 <Input
                   id="idNumber"
+                  inputMode="numeric"
                   value={formData.idNumber}
                   onChange={(e) => setFormData({ ...formData, idNumber: e.target.value })}
                 />
               </div>
               <div>
-                <Label htmlFor="licenceCode">Licence Code</Label>
+                <Label htmlFor="licenceCode">{t("verify.licenceCode")}</Label>
                 <Input
                   id="licenceCode"
                   value={formData.licenceCode}
@@ -141,11 +148,11 @@ export default function ProfileVerification() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="idCopy">ID Copy</Label>
+                <Label htmlFor="idCopy">{t("verify.idCopy")}</Label>
                 <Input id="idCopy" type="file" accept="image/*,.pdf" onChange={(e) => setIdCopy(e.target.files?.[0] ?? null)} />
               </div>
               <div>
-                <Label htmlFor="passportCopy">Passport Copy (optional)</Label>
+                <Label htmlFor="passportCopy">{t("verify.passport")}</Label>
                 <Input
                   id="passportCopy"
                   type="file"
@@ -157,25 +164,23 @@ export default function ProfileVerification() {
 
             <Card className="p-4 space-y-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <h2 className="font-semibold">Face photo</h2>
+                <h2 className="font-semibold">{t("verify.face")}</h2>
                 <div className="flex flex-wrap gap-2">
                   {!capturing ? (
                     <Button type="button" variant="outline" onClick={() => void handleStartCamera()}>
-                      <Camera className="mr-2 h-4 w-4" /> Use camera
+                      <Camera className="mr-2 h-4 w-4" /> {t("verify.useCamera")}
                     </Button>
                   ) : (
                     <Button type="button" onClick={handleCaptureFace} disabled={!ready}>
-                      {ready ? "Capture photo" : "Starting camera…"}
+                      {ready ? t("verify.capture") : t("verify.startingCamera")}
                     </Button>
                   )}
                 </div>
               </div>
-              {cameraError ? <p className="text-xs text-destructive">{cameraError}</p> : null}
-              <p className="text-sm text-muted-foreground">
-                Allow camera access when prompted. If it fails, use <strong>Upload face photo</strong> below.
-              </p>
+              {cameraError ? <p className="text-xs text-destructive">{t(`camera.${cameraError as CameraErrorCode}`)}</p> : null}
+              <p className="text-sm text-muted-foreground">{t("verify.cameraHelp")}</p>
               <div>
-                <Label htmlFor="facePhoto">Upload face photo (alternative)</Label>
+                <Label htmlFor="facePhoto">{t("verify.uploadFace")}</Label>
                 <Input
                   id="facePhoto"
                   type="file"
@@ -195,13 +200,13 @@ export default function ProfileVerification() {
                 }`}
               />
               {faceCapture ? (
-                <img src={faceCapture} alt="Face preview" className="max-w-md rounded-md border" />
+                <img src={faceCapture} alt={t("verify.faceAlt")} className="max-w-md rounded-md border" />
               ) : null}
             </Card>
 
             <Button type="submit" className="w-full" disabled={submitting}>
               <Upload className="mr-2 h-4 w-4" />
-              {submitting ? "Submitting..." : "Submit for Admin Verification"}
+              {submitting ? t("verify.submitting") : t("verify.submit")}
             </Button>
           </form>
         </Card>

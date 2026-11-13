@@ -7,10 +7,14 @@ import { toast } from "sonner";
 import { Camera, Clock, ChevronLeft, ChevronRight, Flag } from "lucide-react";
 import { fetchQuestions, markAttempt, saveAttempt, postTestSessionHeartbeat, endTestSession } from "@/lib/natisApi";
 import { useTestProctoring } from "@/hooks/useTestProctoring";
+import { useLanguage } from "@/i18n/LanguageProvider";
 import type { TestQuestion } from "@/types/question";
 
 const Test = () => {
   const navigate = useNavigate();
+  const { language, t } = useLanguage();
+  const tRef = useRef(t);
+  tRef.current = t;
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [answers, setAnswers] = useState<Record<string, string>>({});
   const [timeRemaining, setTimeRemaining] = useState(3600);
@@ -33,11 +37,11 @@ const Test = () => {
 
   useEffect(() => {
     if (!consentGranted) {
-      toast.error("Complete the monitored test instructions before starting.");
+      toast.error(tRef.current("test.needInstructions"));
       navigate("/instructions");
       return;
     }
-    void proctoring.start();
+    void proctoringRef.current.start();
   }, [consentGranted, navigate]);
 
   useEffect(() => {
@@ -48,11 +52,11 @@ const Test = () => {
         if (data?.length) {
           setQuestions(data);
         } else {
-          toast.error("No questions available. Contact your administrator.");
+          toast.error(t("test.noQuestions"));
           navigate("/portal");
         }
       } catch (e) {
-        toast.error("Could not load question bank from API.", {
+        toast.error(t("test.loadFailed"), {
           description: (e as Error).message,
         });
         navigate("/portal");
@@ -61,7 +65,7 @@ const Test = () => {
       }
     };
     void loadQuestions();
-  }, [navigate]);
+  }, [navigate, t]);
 
   useEffect(() => {
     if (!questions.length || !consentGranted) return;
@@ -210,7 +214,7 @@ const Test = () => {
   if (loadingQuestions || !question) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
-        <p className="text-muted-foreground">Loading your test questions…</p>
+        <p className="text-muted-foreground">{t("test.loading")}</p>
       </div>
     );
   }
@@ -226,7 +230,7 @@ const Test = () => {
                 <span className="font-semibold text-lg">{formatTime(timeRemaining)}</span>
               </div>
               <div className="text-sm text-muted-foreground">
-                Question {currentQuestion + 1} of {questions.length}
+                {t("test.questionOf", { current: currentQuestion + 1, total: questions.length })}
               </div>
             </div>
             <div className="flex-1 min-w-[200px] max-w-xs">
@@ -239,10 +243,10 @@ const Test = () => {
           <div className="flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2 text-sm">
               <Camera className="h-4 w-4 text-primary" />
-              <span>Monitoring active</span>
+              <span>{t("test.monitoring")}</span>
             </div>
             <div className="text-xs text-muted-foreground">
-              Tab switches: {proctoring.tabSwitches} · Face missing events: {proctoring.faceMissingEvents}
+              {t("test.signals", { tabs: proctoring.tabSwitches, face: proctoring.faceMissingEvents })}
             </div>
             <video
               ref={proctoring.videoRef}
@@ -257,7 +261,7 @@ const Test = () => {
 
         <Card className="p-8 mb-4 shadow-lg">
           <div className="flex items-start justify-between mb-6">
-            <h2 className="text-2xl font-semibold">Question {currentQuestion + 1}</h2>
+            <h2 className="text-2xl font-semibold">{t("test.question", { number: currentQuestion + 1 })}</h2>
             <Button
               variant="ghost"
               size="sm"
@@ -268,13 +272,14 @@ const Test = () => {
             </Button>
           </div>
 
+          {language !== "en" ? <p className="mb-4 text-sm text-muted-foreground">{t("test.englishBank")}</p> : null}
           <p className="text-lg mb-6 leading-relaxed">{question.question}</p>
 
           {question.imageUrl ? (
             <div className="mb-8 flex justify-center rounded-lg border bg-muted/30 p-4">
               <img
                 src={question.imageUrl}
-                alt="Diagram for this question"
+                alt={t("test.diagramAlt")}
                 className="max-h-48 w-full max-w-md object-contain"
               />
             </div>
@@ -301,23 +306,23 @@ const Test = () => {
         <div className="flex gap-4 justify-between">
           <Button variant="outline" onClick={handlePrevious} disabled={currentQuestion === 0}>
             <ChevronLeft className="mr-2 h-4 w-4" />
-            Previous
+            {t("test.previous")}
           </Button>
 
           {currentQuestion === questions.length - 1 ? (
             <Button onClick={() => void handleSubmit()} size="lg" disabled={submitting}>
-              {submitting ? "Submitting…" : "Submit test"}
+              {submitting ? t("test.submitting") : t("test.submit")}
             </Button>
           ) : (
             <Button onClick={handleNext}>
-              Next
+              {t("test.next")}
               <ChevronRight className="ml-2 h-4 w-4" />
             </Button>
           )}
         </div>
 
         <Card className="p-6 mt-6 shadow-lg">
-          <h3 className="font-semibold mb-4">Question navigator</h3>
+          <h3 className="font-semibold mb-4">{t("test.navigator")}</h3>
           <div className="grid grid-cols-10 gap-2">
             {questions.map((q, idx) => (
               <button

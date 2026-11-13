@@ -20,6 +20,7 @@ import NotRejectedRoute from "./components/guards/NotRejectedRoute";
 import BookingReadyRoute from "./components/guards/BookingReadyRoute";
 import NonAdminRoute from "./components/guards/NonAdminRoute";
 import { AuthProvider } from "./components/auth/AuthProvider";
+import { LanguageProvider } from "./i18n/LanguageProvider";
 import Portal from "./pages/Portal";
 import CandidateProfile from "./pages/CandidateProfile";
 import Certificate from "./pages/Certificate";
@@ -28,6 +29,7 @@ const queryClient = new QueryClient();
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
+    <LanguageProvider>
     <AuthProvider>
       <TooltipProvider>
         <Toaster />
@@ -138,6 +140,7 @@ const App = () => (
         </BrowserRouter>
       </TooltipProvider>
     </AuthProvider>
+    </LanguageProvider>
   </QueryClientProvider>
 );
 

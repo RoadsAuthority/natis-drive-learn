@@ -52,6 +52,9 @@ export function useTestProctoring({ enabled, snapshotIntervalMs = 30000 }: Optio
   const stop = useCallback(() => {
     streamRef.current?.getTracks().forEach((track) => track.stop());
     streamRef.current = null;
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => {});
+    }
     if (videoRef.current) {
       videoRef.current.srcObject = null;
     }
@@ -88,8 +91,21 @@ export function useTestProctoring({ enabled, snapshotIntervalMs = 30000 }: Optio
         setTabSwitches((prev) => prev + 1);
       }
     };
+    let wasFullscreen = document.fullscreenElement !== null;
+    const onFullscreenChange = () => {
+      if (document.fullscreenElement) {
+        wasFullscreen = true;
+      } else if (wasFullscreen) {
+        wasFullscreen = false;
+        setTabSwitches((prev) => prev + 1);
+      }
+    };
     document.addEventListener("visibilitychange", onVisibilityChange);
-    return () => document.removeEventListener("visibilitychange", onVisibilityChange);
+    document.addEventListener("fullscreenchange", onFullscreenChange);
+    return () => {
+      document.removeEventListener("visibilitychange", onVisibilityChange);
+      document.removeEventListener("fullscreenchange", onFullscreenChange);
+    };
   }, [active, enabled]);
 
   useEffect(() => {

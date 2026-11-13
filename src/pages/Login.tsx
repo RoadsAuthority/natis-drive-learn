@@ -9,11 +9,14 @@ import { toast } from "sonner";
 import { LogIn, UserPlus, ArrowLeft } from "lucide-react";
 import { signIn, signUp } from "@/lib/auth";
 import { useAuthContext } from "@/components/auth/AuthProvider";
+import { useLanguage } from "@/i18n/LanguageProvider";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 const Login = () => {
   const navigate = useNavigate();
   const { refresh } = useAuthContext();
-  const [loginData, setLoginData] = useState({ email: "", password: "" });
+  const { t } = useLanguage();
+  const [loginData, setLoginData] = useState({ idNumber: "", password: "" });
   const [registerData, setRegisterData] = useState({
     firstName: "",
     surname: "",
@@ -24,18 +27,22 @@ const Login = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!loginData.email || !loginData.password) {
-      toast.error("Please fill in all fields");
+    if (!loginData.idNumber || !loginData.password) {
+      toast.error(t("login.fillAll"));
+      return;
+    }
+    if (!/^\d+$/.test(loginData.idNumber.trim())) {
+      toast.error(t("login.idDigitsOnly"));
       return;
     }
     try {
-      const { error } = await signIn(loginData.email, loginData.password);
+      const { error } = await signIn(loginData.idNumber.trim(), loginData.password);
       if (error) {
         toast.error(error.message);
         return;
       }
       const profile = await refresh();
-      toast.success("Login successful!");
+      toast.success(t("login.loginSuccess"));
       navigate(profile?.role === "admin" ? "/admin" : "/portal");
     } catch (error) {
       toast.error((error as Error).message);
@@ -45,7 +52,11 @@ const Login = () => {
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!Object.values(registerData).every((val) => val)) {
-      toast.error("Please fill in all fields");
+      toast.error(t("login.fillAll"));
+      return;
+    }
+    if (!/^\d+$/.test(registerData.idNumber.trim())) {
+      toast.error(t("login.idDigitsOnly"));
       return;
     }
     try {
@@ -59,7 +70,7 @@ const Login = () => {
         return;
       }
       const profile = await refresh();
-      toast.success("Registration successful! Check email for confirmation if required.");
+      toast.success(t("login.registerSuccess"));
       navigate(profile?.role === "admin" ? "/admin" : "/portal");
     } catch (error) {
       toast.error((error as Error).message);
@@ -69,52 +80,52 @@ const Login = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        <Button
-          variant="ghost"
-          onClick={() => navigate("/")}
-          className="mb-4"
-        >
-          <ArrowLeft className="mr-2 h-4 w-4" />
-          Back to Language Selection
-        </Button>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <Button variant="ghost" onClick={() => navigate("/")}>
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            {t("login.back")}
+          </Button>
+          <LanguageSwitcher />
+        </div>
 
         <Card className="p-8 shadow-lg">
           <div className="text-center mb-6">
-            <h1 className="text-3xl font-bold text-foreground">Learner Licence Portal</h1>
-            <p className="text-muted-foreground mt-2">Access your learner's test</p>
+            <h1 className="text-3xl font-bold text-foreground">{t("login.title")}</h1>
+            <p className="text-muted-foreground mt-2">{t("login.subtitle")}</p>
           </div>
 
           <Tabs defaultValue="login" className="w-full">
             <TabsList className="grid w-full grid-cols-2">
-              <TabsTrigger value="login">Login</TabsTrigger>
-              <TabsTrigger value="register">Register</TabsTrigger>
+              <TabsTrigger value="login">{t("login.login")}</TabsTrigger>
+              <TabsTrigger value="register">{t("login.register")}</TabsTrigger>
             </TabsList>
 
             <TabsContent value="login">
               <form onSubmit={handleLogin} className="space-y-4">
                 <div>
-                  <Label htmlFor="login-email">Email or ID Number</Label>
+                  <Label htmlFor="login-id-number">{t("login.idNumber")}</Label>
                   <Input
-                    id="login-email"
+                    id="login-id-number"
                     type="text"
-                    value={loginData.email}
-                    onChange={(e) => setLoginData({ ...loginData, email: e.target.value })}
-                    placeholder="Enter your email or ID"
+                    inputMode="numeric"
+                    value={loginData.idNumber}
+                    onChange={(e) => setLoginData({ ...loginData, idNumber: e.target.value })}
+                    placeholder={t("login.idNumberPlaceholder")}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="login-password">Password</Label>
+                  <Label htmlFor="login-password">{t("login.password")}</Label>
                   <Input
                     id="login-password"
                     type="password"
                     value={loginData.password}
                     onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
-                    placeholder="Enter your password"
+                    placeholder={t("login.passwordPlaceholder")}
                   />
                 </div>
                 <Button type="submit" className="w-full" size="lg">
                   <LogIn className="mr-2 h-4 w-4" />
-                  Login
+                  {t("login.login")}
                 </Button>
               </form>
             </TabsContent>
@@ -123,41 +134,42 @@ const Login = () => {
               <form onSubmit={handleRegister} className="space-y-4">
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <Label htmlFor="first-name">First Name</Label>
+                    <Label htmlFor="first-name">{t("login.firstName")}</Label>
                     <Input
                       id="first-name"
                       value={registerData.firstName}
                       onChange={(e) =>
                         setRegisterData({ ...registerData, firstName: e.target.value })
                       }
-                      placeholder="First name"
+                      placeholder={t("login.firstNamePlaceholder")}
                     />
                   </div>
                   <div>
-                    <Label htmlFor="surname">Surname</Label>
+                    <Label htmlFor="surname">{t("login.surname")}</Label>
                     <Input
                       id="surname"
                       value={registerData.surname}
                       onChange={(e) =>
                         setRegisterData({ ...registerData, surname: e.target.value })
                       }
-                      placeholder="Surname"
+                      placeholder={t("login.surnamePlaceholder")}
                     />
                   </div>
                 </div>
                 <div>
-                  <Label htmlFor="id-number">ID Number</Label>
+                  <Label htmlFor="id-number">{t("login.idNumber")}</Label>
                   <Input
                     id="id-number"
+                      inputMode="numeric"
                     value={registerData.idNumber}
                     onChange={(e) =>
                       setRegisterData({ ...registerData, idNumber: e.target.value })
                     }
-                    placeholder="Enter your ID number"
+                    placeholder={t("login.idNumberPlaceholder")}
                   />
                 </div>
                 <div>
-                  <Label htmlFor="register-email">Email</Label>
+                  <Label htmlFor="register-email">{t("login.email")}</Label>
                   <Input
                     id="register-email"
                     type="email"
@@ -169,7 +181,7 @@ const Login = () => {
                   />
                 </div>
                 <div>
-                  <Label htmlFor="register-password">Password</Label>
+                  <Label htmlFor="register-password">{t("login.password")}</Label>
                   <Input
                     id="register-password"
                     type="password"
@@ -177,12 +189,12 @@ const Login = () => {
                     onChange={(e) =>
                       setRegisterData({ ...registerData, password: e.target.value })
                     }
-                    placeholder="Create a password"
+                    placeholder={t("login.passwordCreate")}
                   />
                 </div>
                 <Button type="submit" className="w-full" size="lg">
                   <UserPlus className="mr-2 h-4 w-4" />
-                  Register
+                  {t("login.register")}
                 </Button>
               </form>
             </TabsContent>

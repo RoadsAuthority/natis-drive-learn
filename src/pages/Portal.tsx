@@ -21,6 +21,8 @@ import { Progress } from "@/components/ui/progress";
 import { useAuthContext } from "@/components/auth/AuthProvider";
 import { useEligibility } from "@/hooks/useEligibility";
 import { formatDateShort } from "@/lib/formatDate";
+import { useLanguage } from "@/i18n/LanguageProvider";
+import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 type StepStatus = "done" | "in_review" | "action_needed" | "locked";
 
@@ -53,6 +55,8 @@ function statusBadgeVariant(status: StepStatus): "default" | "secondary" | "outl
 export default function Portal() {
   const navigate = useNavigate();
   const { user, profile, logout, refresh } = useAuthContext();
+  const { language, languages, locale, t, usingFallback } = useLanguage();
+  const selectedLanguage = languages.find((item) => item.code === language);
   const {
     profileVerified,
     profileRejected,
@@ -102,51 +106,51 @@ export default function Portal() {
   const steps: Step[] = [
     {
       key: "verify",
-      title: "1. Identity & documents",
-      description: "Upload ID/passport, face photo, and submit for verifier review.",
+      title: t("portal.stepVerifyTitle"),
+      description: t("portal.stepVerifyBody"),
       status: verifyStatus,
       statusLabel: profileVerified
-        ? "Verified"
+        ? t("portal.verified")
         : docsPendingReview
-          ? "Awaiting verifier"
+          ? t("portal.awaitingVerifier")
           : profileRejected
-            ? "Not approved"
-            : "Not started",
+            ? t("portal.notApproved")
+            : t("portal.notStarted"),
       href: "/profile-verification",
-      actionLabel: docsSubmitted || profileVerified ? "View / update" : "Continue",
+      actionLabel: docsSubmitted || profileVerified ? t("portal.viewUpdate") : t("portal.continue"),
     },
     {
       key: "eye",
-      title: "2. Vision screening",
-      description: "On-screen letters or doctor letter upload.",
+      title: t("portal.stepEyeTitle"),
+      description: t("portal.stepEyeBody"),
       status: eyeStatus,
-      statusLabel: eyeTestComplete ? "Complete" : canAccessEyeTest ? "Required" : "Locked",
+      statusLabel: eyeTestComplete ? t("portal.complete") : canAccessEyeTest ? t("portal.required") : t("portal.locked"),
       href: "/eye-test",
-      actionLabel: eyeTestComplete ? "View" : "Open",
+      actionLabel: eyeTestComplete ? t("portal.view") : t("portal.open"),
     },
     {
       key: "book",
-      title: "3. Book & pay",
-      description: "Choose a slot and complete payment.",
+      title: t("portal.stepBookTitle"),
+      description: t("portal.stepBookBody"),
       status: bookStatus,
-      statusLabel: paymentComplete ? "Booked & paid" : canBook ? "Required" : "Locked",
+      statusLabel: paymentComplete ? t("portal.bookedPaid") : canBook ? t("portal.required") : t("portal.locked"),
       href: "/booking",
-      actionLabel: paymentComplete ? "View booking" : "Book",
+      actionLabel: paymentComplete ? t("portal.viewBooking") : t("portal.book"),
     },
     {
       key: "test",
-      title: "4. Learner theory test",
-      description: "70 questions, 60 minutes, 80% pass mark.",
+      title: t("portal.stepTestTitle"),
+      description: t("portal.stepTestBody"),
       status: testStatus,
       statusLabel: testPassed
-        ? "Passed"
+        ? t("portal.passed")
         : testAttempted
-          ? "Retake when eligible"
+          ? t("portal.retake")
           : canTakeTest
-            ? "Ready"
-            : "Locked",
+            ? t("portal.ready")
+            : t("portal.locked"),
       href: testPassed ? "/certificate" : "/instructions",
-      actionLabel: testPassed ? "Certificate" : testAttempted ? "View info" : "Start",
+      actionLabel: testPassed ? t("portal.certificate") : testAttempted ? t("portal.viewInfo") : t("portal.start"),
     },
   ];
 
@@ -166,35 +170,42 @@ export default function Portal() {
       <div className="mx-auto max-w-2xl space-y-6">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Learner Licence Portal</h1>
+            <h1 className="text-2xl font-bold tracking-tight">{t("portal.title")}</h1>
             <p className="text-sm text-muted-foreground">{user?.email}</p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            <LanguageSwitcher />
             <Button variant="outline" size="sm" onClick={() => navigate("/my-profile")}>
               <User className="mr-2 h-4 w-4" />
-              My profile
+              {t("portal.profile")}
             </Button>
             {testPassed ? (
               <Button variant="outline" size="sm" onClick={() => navigate("/certificate")}>
                 <Award className="mr-2 h-4 w-4" />
-                Certificate
+                {t("portal.certificate")}
               </Button>
             ) : null}
             <Button variant="outline" size="sm" onClick={() => void refresh()}>
-              Refresh status
+              {t("portal.refresh")}
             </Button>
             <Button variant="ghost" size="sm" onClick={() => void handleLogout()}>
               <LogOut className="mr-2 h-4 w-4" />
-              Sign out
+              {t("portal.signOut")}
             </Button>
           </div>
         </div>
 
+        {usingFallback && selectedLanguage ? (
+          <p className="text-sm text-muted-foreground">
+            {t("language.pending", { language: selectedLanguage.nativeName })}
+          </p>
+        ) : null}
+
         {profileRejected ? (
           <Card className="border-destructive/50 bg-destructive/5 p-4 text-sm text-destructive">
-            <p className="font-semibold mb-1">Application not approved.</p>
-            <p>{profile?.rejection_reason ?? "No reason was supplied by verifier."}</p>
-            <p className="mt-2">Contact your testing centre if you need support.</p>
+            <p className="font-semibold mb-1">{t("portal.rejectedTitle")}</p>
+            <p>{profile?.rejection_reason ?? t("portal.rejectedFallback")}</p>
+            <p className="mt-2">{t("portal.rejectedHelp")}</p>
           </Card>
         ) : null}
 
@@ -205,26 +216,25 @@ export default function Portal() {
                 <CheckCircle2 className="h-6 w-6 text-success" />
               </div>
               <div>
-                <h2 className="text-xl font-semibold">Congratulations — journey complete!</h2>
-                <p className="text-sm text-muted-foreground">
-                  You passed the theory test. View your profile and download your certificate.
-                </p>
+                <h2 className="text-xl font-semibold">{t("portal.completeTitle")}</h2>
+                <p className="text-sm text-muted-foreground">{t("portal.completeBody")}</p>
               </div>
             </div>
             {testSchedule?.license_collection_from ? (
               <p className="text-sm rounded-md border border-success/20 bg-background/60 p-3">
-                Collect your learner&apos;s licence from{" "}
-                <strong>{formatDateShort(testSchedule.license_collection_from) ?? "—"}</strong>.
+                {t("portal.collectFrom", {
+                  date: formatDateShort(testSchedule.license_collection_from, locale) ?? "—",
+                })}
               </p>
             ) : null}
             <div className="flex flex-wrap gap-2">
               <Button onClick={() => navigate("/my-profile")}>
                 <User className="mr-2 h-4 w-4" />
-                My profile
+                {t("portal.profile")}
               </Button>
               <Button variant="default" onClick={() => navigate("/certificate")}>
                 <Award className="mr-2 h-4 w-4" />
-                View certificate
+                {t("portal.viewCertificate")}
               </Button>
             </div>
           </Card>
@@ -233,9 +243,9 @@ export default function Portal() {
             {!profileRejected ? (
               <Card className="p-4 space-y-3">
                 <div className="flex items-center justify-between gap-2 text-sm">
-                  <span className="font-medium">Journey progress</span>
+                  <span className="font-medium">{t("portal.progress")}</span>
                   <span className="text-muted-foreground">
-                    {completedStepCount} of {totalSteps} complete
+                    {t("portal.progressCount", { done: completedStepCount, total: totalSteps })}
                   </span>
                 </div>
                 <Progress value={progressPercent} />
@@ -244,17 +254,16 @@ export default function Portal() {
 
             {docsPendingReview ? (
               <Card className="border-amber-500/30 bg-amber-500/5 p-4 text-sm">
-                <strong>Awaiting verifier.</strong> Your documents are in queue. Step 1 will be marked complete once
-                approved.
+                <strong>{t("portal.awaiting")}</strong> {t("portal.awaitingBody")}
               </Card>
             ) : null}
 
             {profileVerified && !eyeTestComplete ? (
               <Card className="border-primary/30 bg-primary/5 p-4 text-sm">
-                <p className="font-semibold mb-1">Documents verified.</p>
-                <p className="mb-3">Next step: complete vision screening.</p>
+                <p className="font-semibold mb-1">{t("portal.verifiedTitle")}</p>
+                <p className="mb-3">{t("portal.verifiedNext")}</p>
                 <Button size="sm" onClick={() => navigate("/eye-test")}>
-                  Continue to vision screening
+                  {t("portal.verifiedAction")}
                   <ArrowRight className="ml-2 h-4 w-4" />
                 </Button>
               </Card>
@@ -262,7 +271,7 @@ export default function Portal() {
 
             {testSchedule && !testSchedule.can_take_test && testSchedule.test_block_reason ? (
               <Card className="border-amber-500/30 bg-amber-500/5 p-4 text-sm">
-                <p className="font-semibold mb-1">Test waiting period</p>
+                <p className="font-semibold mb-1">{t("portal.waitingTitle")}</p>
                 <p>{testSchedule.test_block_reason}</p>
               </Card>
             ) : null}
@@ -270,7 +279,7 @@ export default function Portal() {
             <Card className="p-6 space-y-4">
               <h2 className="font-semibold flex items-center gap-2">
                 <FileCheck2 className="h-5 w-5 text-primary" />
-                Your learning journey
+                {t("portal.journey")}
               </h2>
               <ol className="space-y-4">
                 {steps.map((step) => {
@@ -326,12 +335,12 @@ export default function Portal() {
         <div className="grid gap-3 sm:grid-cols-2">
           <Button variant="outline" className="justify-start h-auto py-4" onClick={() => navigate("/study")}>
             <BookOpen className="mr-3 h-5 w-5 shrink-0" />
-            <span className="text-left text-sm">Official PDFs (learner book & practice papers)</span>
+            <span className="text-left text-sm">{t("portal.study")}</span>
           </Button>
           {profile?.role === "admin" ? (
             <Button variant="outline" className="justify-start h-auto py-4" onClick={() => navigate("/admin")}>
               <Shield className="mr-3 h-5 w-5 shrink-0" />
-              <span className="text-left text-sm">Verifier / admin console</span>
+              <span className="text-left text-sm">{t("portal.admin")}</span>
             </Button>
           ) : null}
         </div>

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useLanguage } from "@/i18n/LanguageProvider";
 import { Progress } from "@/components/ui/progress";
 
 const ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ";
@@ -42,6 +43,7 @@ export default function SnellenScreening({
   onComplete,
   onCancel,
 }: Props) {
+  const { t } = useLanguage();
   const lines = useMemo(() => buildLines(lineCount), [lineCount]);
   const [lineIndex, setLineIndex] = useState(0);
   const [entry, setEntry] = useState("");
@@ -104,9 +106,9 @@ export default function SnellenScreening({
     <div className="space-y-4">
       <div className="flex items-center justify-between gap-3 text-sm text-muted-foreground">
         <span>
-          Line {lineIndex + 1} of {lines.length}
+          {t("eye.line", { current: lineIndex + 1, total: lines.length })}
         </span>
-        <span>{secondsLeft}s left on this line</span>
+        <span>{t("eye.seconds", { seconds: secondsLeft })}</span>
       </div>
       <Progress value={progress} className="h-2" />
       <div className="rounded-md border bg-card p-6 text-center font-bold tracking-[0.35em]">
@@ -124,23 +126,23 @@ export default function SnellenScreening({
         ))}
       </div>
       <div className="space-y-2">
-        <Label htmlFor="snellen-entry">Type the letters on the current line</Label>
+        <Label htmlFor="snellen-entry">{t("eye.typeLetters")}</Label>
         <Input
           id="snellen-entry"
           value={entry}
           onChange={(e) => setEntry(e.target.value)}
-          placeholder="Enter letters exactly as shown"
+          placeholder={t("eye.lettersPlaceholder")}
           autoComplete="off"
           spellCheck={false}
         />
       </div>
       <div className="flex flex-wrap gap-2">
         <Button type="button" onClick={submitLine}>
-          Submit line
+          {t("eye.submitLine")}
         </Button>
         {onCancel ? (
           <Button type="button" variant="outline" onClick={onCancel}>
-            Cancel
+            {t("eye.cancel")}
           </Button>
         ) : null}
       </div>

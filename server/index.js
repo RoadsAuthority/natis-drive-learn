@@ -322,7 +322,7 @@ app.post("/api/auth/register", async (req, res) => {
     password: z.string().min(6),
     first_name: z.string().optional(),
     surname: z.string().optional(),
-    id_number: z.string().optional(),
+    id_number: z.string().trim().regex(/^\d+$/),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) {
@@ -354,20 +354,19 @@ app.post("/api/auth/register", async (req, res) => {
 
 app.post("/api/auth/login", async (req, res) => {
   const schema = z.object({
-    email: z.string().min(1),
+    idNumber: z.string().trim().regex(/^\d+$/),
     password: z.string().min(1),
   });
   const parsed = schema.safeParse(req.body);
   if (!parsed.success) {
     return res.status(400).json({ message: "Invalid login payload." });
   }
-  const { email, password } = parsed.data;
-  const identifier = email.trim();
+  const { idNumber, password } = parsed.data;
   try {
     const rows = await sql`
       select id, email, role, password_hash
       from profiles
-      where lower(email) = lower(${identifier}) or id_number = ${identifier}
+      where id_number = ${idNumber}
       limit 1
     `;
     if (!rows.length) {
@@ -521,6 +520,10 @@ app.post(
       const profileId = req.user.sub;
       const { firstName, surname, idNumber, licenceCode, faceCaptureBase64 } = req.body;
 
+      if (typeof idNumber !== "string" || !/^\d+$/.test(idNumber.trim())) {
+        return res.status(400).json({ message: "Enter a valid ID number using digits only." });
+      }
+
       const files = req.files ?? {};
       const idCopy = files.idCopy?.[0] ?? null;
       const passportCopy = files.passportCopy?.[0] ?? null;
@@ -652,7 +655,10 @@ app.post("/api/eye-test/submit", authMiddleware, upload.single("doctorLetter"), 
 
 app.post("/api/bookings", authMiddleware, async (req, res) => {
   const schema = z.object({
-    bookingDate: z.string().min(1),
+    bookingDate: z.string().regex(/^\d{4}-\d{2}-\d{2}$/).refine((value) => {
+      const date = new Date(`${value}T00:00:00.000Z`);
+      return !Number.isNaN(date.valueOf()) && date.toISOString().slice(0, 10) === value;
+    }),
     slotTime: z.string().min(1),
   });
   const parsed = schema.safeParse(req.body);
@@ -661,6 +667,9 @@ app.post("/api/bookings", authMiddleware, async (req, res) => {
   }
   const profileId = req.user.sub;
   const { bookingDate, slotTime } = parsed.data;
+  if (bookingDate < new Date().toISOString().slice(0, 10)) {
+    return res.status(400).json({ message: "Booking date cannot be in the past." });
+  }
 
   const [prow] = await sql`
     select verification_status, eye_test_status from profiles where id = ${profileId} limit 1

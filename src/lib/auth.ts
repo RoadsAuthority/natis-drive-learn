@@ -44,11 +44,11 @@ export type UserProfile = {
   } | null;
 };
 
-export async function signIn(email: string, password: string) {
+export async function signIn(idNumber: string, password: string) {
   if (!isApiConfigured()) {
     const fallback: Session = {
       token: "local-dev-token",
-      user: { id: "local-user", email },
+      user: { id: "local-user", email: idNumber },
     };
     localStorage.setItem("session", JSON.stringify(fallback));
     return { error: null };
@@ -56,7 +56,7 @@ export async function signIn(email: string, password: string) {
   try {
     const response = await apiRequest<Session>("/api/auth/login", {
       method: "POST",
-      body: { email, password },
+      body: { idNumber, password },
     });
     localStorage.setItem("session", JSON.stringify(response));
     return { error: null };

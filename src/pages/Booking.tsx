@@ -9,32 +9,38 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { confirmPayment, createBooking } from "@/lib/natisApi";
 import { useAuthContext } from "@/components/auth/AuthProvider";
+import { useLanguage } from "@/i18n/LanguageProvider";
 
 const slots = ["08:00", "10:00", "12:00", "14:00", "16:00"];
 
 export default function Booking() {
   const navigate = useNavigate();
   const { refresh } = useAuthContext();
+  const { t } = useLanguage();
   const [bookingDate, setBookingDate] = useState("");
   const [slot, setSlot] = useState("");
   const [paid, setPaid] = useState(false);
   const paypalClientId = import.meta.env.VITE_PAYPAL_CLIENT_ID;
   const allowSandboxPayment =
     import.meta.env.DEV || import.meta.env.VITE_ALLOW_SANDBOX_PAYMENT === "true";
+  const now = new Date();
+  const minBookingDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(
+    now.getDate(),
+  ).padStart(2, "0")}`;
 
   const persistBooking = async () => {
-    if (!bookingDate || !slot) {
-      toast.error("Choose date and slot.");
+    if (!bookingDate || bookingDate < minBookingDate || !slot) {
+      toast.error(t("booking.choose"));
       return;
     }
     if (!paid) {
-      toast.error("Payment is required before booking confirmation.");
+      toast.error(t("booking.needPayment"));
       return;
     }
     await createBooking(bookingDate, slot, paid);
     localStorage.setItem("paymentStatus", "paid");
     await refresh();
-    toast.success("Booking confirmed.");
+    toast.success(t("booking.confirmed"));
     navigate("/instructions");
   };
 
@@ -42,10 +48,16 @@ export default function Booking() {
     <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background p-6">
       <div className="mx-auto max-w-2xl">
         <Card className="p-6 space-y-4">
-          <h1 className="text-2xl font-bold flex items-center gap-2"><CalendarDays className="h-5 w-5" /> Book Learner Test</h1>
+          <h1 className="text-2xl font-bold flex items-center gap-2"><CalendarDays className="h-5 w-5" /> {t("booking.title")}</h1>
           <div>
-            <Label htmlFor="booking-date">Booking date</Label>
-            <Input id="booking-date" type="date" value={bookingDate} onChange={(e) => setBookingDate(e.target.value)} />
+            <Label htmlFor="booking-date">{t("booking.date")}</Label>
+            <Input
+              id="booking-date"
+              type="date"
+              min={minBookingDate}
+              value={bookingDate}
+              onChange={(e) => setBookingDate(e.target.value)}
+            />
           </div>
           <div>
             <Label>Available slots</Label>
