@@ -17,5 +17,5 @@ services:
         generateValue: true
       - key: FRONTEND_ORIGIN
         sync: false
-      - key: ADMIN_EMAILS
+      - key: ADMIN_SETUP_KEY
         sync: false

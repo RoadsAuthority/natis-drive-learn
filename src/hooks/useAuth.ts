@@ -6,23 +6,33 @@ export function useAuth() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
 
+  const clearSession = useCallback(() => {
+    localStorage.removeItem("session");
+    setSession(null);
+    setProfile(null);
+  }, []);
+
   const refresh = useCallback(async () => {
     const currentSession = await getSession();
     setSession(currentSession);
     if (currentSession?.user) {
       try {
         const p = await getProfile();
+        if (!p) {
+          clearSession();
+          return null;
+        }
         setProfile(p);
         return p;
       } catch {
-        setProfile(null);
+        clearSession();
         return null;
       }
     } else {
       setProfile(null);
       return null;
     }
-  }, []);
+  }, [clearSession]);
 
   useEffect(() => {
     let mounted = true;
@@ -36,9 +46,13 @@ export function useAuth() {
           try {
             const p = await getProfile();
             if (!mounted) return;
+            if (!p) {
+              clearSession();
+              return;
+            }
             setProfile(p);
           } catch {
-            if (mounted) setProfile(null);
+            if (mounted) clearSession();
           }
         }
       } finally {
@@ -53,7 +67,7 @@ export function useAuth() {
     return () => {
       mounted = false;
     };
-  }, []);
+  }, [clearSession]);
 
   const isVerified = useMemo(() => {
     return profile?.verification_status === "approved";

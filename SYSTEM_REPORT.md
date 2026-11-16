@@ -192,7 +192,7 @@ Every approval and rejection is attributable and traceable.
 | **Testing centre / institution** | Operates the platform | Reduced manual handling, digital records, scalable bookings |
 | **Assessor / reviewer** | Evaluates the prototype | End-to-end demo, cloud deployment, documented API |
 
-Access is role-based: candidates and admins share login but are routed to different experiences (`/portal` vs `/admin`). Admin accounts are granted via configurable `ADMIN_EMAILS` at registration time.
+Access is role-based: candidates and admins sign in with ID number and password and are routed to different experiences (`/portal` vs `/admin`). Public registration always creates candidate accounts. The first admin is created through a one-time server-secret bootstrap endpoint; admin authorization is checked against the current database role and logout revokes issued tokens.
 
 ---
 

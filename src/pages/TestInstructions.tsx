@@ -31,8 +31,8 @@ const TestInstructions = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background flex items-center justify-center p-4">
-      <div className="w-full max-w-4xl">
+    <div className="w-full">
+      <div className="mx-auto w-full max-w-5xl">
         <Card className="p-8 shadow-lg">
           <div className="flex items-center gap-3 mb-6">
             <div className="p-3 rounded-lg bg-primary/10">

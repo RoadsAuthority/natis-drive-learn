@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Award, FileCheck2, LogOut } from "lucide-react";
+import { Award, FileCheck2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -17,7 +17,7 @@ function statusLabel(status: string, t: (path: string) => string) {
 
 export default function CandidateProfile() {
   const navigate = useNavigate();
-  const { user, profile, logout, refresh } = useAuthContext();
+  const { user, profile, refresh } = useAuthContext();
   const { locale, t } = useLanguage();
   const { testPassed, testAttempted, profileVerified, eyeTestComplete, paymentComplete, testSchedule } =
     useEligibility();
@@ -26,26 +26,11 @@ export default function CandidateProfile() {
     void refresh();
   }, [refresh]);
 
-  const handleLogout = async () => {
-    await logout();
-    navigate("/login");
-  };
-
   const fullName = [profile?.first_name, profile?.surname].filter(Boolean).join(" ") || user?.email || "—";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background p-6">
-      <div className="mx-auto max-w-2xl space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <Button variant="ghost" size="sm" onClick={() => navigate("/portal")}>
-            <ArrowLeft className="mr-2 h-4 w-4" />
-            {t("profile.back")}
-          </Button>
-          <Button variant="ghost" size="sm" onClick={() => void handleLogout()}>
-            <LogOut className="mr-2 h-4 w-4" />
-            {t("profile.signOut")}
-          </Button>
-        </div>
+    <div className="w-full">
+      <div className="mx-auto max-w-5xl space-y-6">
 
         <Card className="p-6 space-y-4">
           <div className="flex items-start justify-between gap-4">

@@ -2,7 +2,6 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
 import { toast } from "sonner";
 import { Camera, Clock, ChevronLeft, ChevronRight, Flag } from "lucide-react";
 import { fetchQuestions, markAttempt, saveAttempt, postTestSessionHeartbeat, endTestSession } from "@/lib/natisApi";
@@ -220,127 +219,150 @@ const Test = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background p-4 py-8">
-      <div className="max-w-4xl mx-auto">
-        <Card className="p-4 mb-4 shadow-lg">
-          <div className="flex items-center justify-between flex-wrap gap-4">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <Clock className="h-5 w-5 text-primary" />
-                <span className="font-semibold text-lg">{formatTime(timeRemaining)}</span>
-              </div>
-              <div className="text-sm text-muted-foreground">
+    <div className="w-full">
+      <div className="grid items-start gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
+        <aside className="space-y-4 xl:sticky xl:top-24">
+          <Card className="overflow-hidden border-0 bg-primary p-0 text-primary-foreground shadow-sm">
+            <div className="border-b border-white/15 px-5 py-4">
+              <p className="text-xs font-medium uppercase tracking-wide text-white/70">{t("portal.stepTestTitle")}</p>
+              <p className="mt-1 text-sm font-semibold">
                 {t("test.questionOf", { current: currentQuestion + 1, total: questions.length })}
+              </p>
+            </div>
+            <div className="px-5 py-5">
+              <div className="mb-2 flex items-center gap-2 text-white/80">
+                <Clock className="h-4 w-4" />
+                <span className="text-xs font-medium uppercase tracking-wide">{t("test.timeRemaining")}</span>
+              </div>
+              <p className="font-mono text-3xl font-semibold tabular-nums">{formatTime(timeRemaining)}</p>
+              <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-white/20">
+                <div className="h-full rounded-full bg-white transition-all" style={{ width: `${progress}%` }} />
               </div>
             </div>
-            <div className="flex-1 min-w-[200px] max-w-xs">
-              <Progress value={progress} className="h-2" />
-            </div>
-          </div>
-        </Card>
+          </Card>
 
-        <Card className="p-4 mb-4 shadow-lg">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div className="flex items-center gap-2 text-sm">
+          <Card className="p-4 shadow-sm">
+            <div className="mb-3 flex items-center justify-between gap-2">
+              <h2 className="text-sm font-semibold">{t("test.navigator")}</h2>
+              <span className="text-xs text-muted-foreground">{Object.keys(answers).length}/{questions.length}</span>
+            </div>
+            <div className="grid grid-cols-6 gap-2">
+              {questions.map((q, idx) => (
+                <button
+                  key={q.id}
+                  type="button"
+                  aria-label={t("test.question", { number: idx + 1 })}
+                  aria-current={currentQuestion === idx ? "step" : undefined}
+                  onClick={() => setCurrentQuestion(idx)}
+                  className={`aspect-square rounded-md text-xs font-semibold transition-colors ${
+                    currentQuestion === idx
+                      ? "bg-primary text-primary-foreground"
+                      : answers[q.id]
+                        ? "bg-success/20 text-foreground hover:bg-success/30"
+                        : "bg-muted text-muted-foreground hover:bg-secondary/15 hover:text-foreground"
+                  } ${flagged.has(idx) ? "ring-2 ring-destructive ring-offset-1" : ""}`}
+                >
+                  {idx + 1}
+                </button>
+              ))}
+            </div>
+          </Card>
+        </aside>
+
+        <section className="min-w-0 space-y-4">
+          <Card className="flex flex-wrap items-center justify-between gap-3 p-3 shadow-sm">
+            <div className="flex items-center gap-2 text-sm font-medium">
               <Camera className="h-4 w-4 text-primary" />
               <span>{t("test.monitoring")}</span>
+              <span className="h-2 w-2 rounded-full bg-success" />
             </div>
             <div className="text-xs text-muted-foreground">
               {t("test.signals", { tabs: proctoring.tabSwitches, face: proctoring.faceMissingEvents })}
             </div>
             <video
               ref={proctoring.videoRef}
-              className="h-16 w-24 rounded-md border object-cover"
+              className="h-12 w-[72px] rounded-md border border-border object-cover"
               autoPlay
               muted
               playsInline
             />
-          </div>
-          {proctoring.error ? <p className="mt-2 text-xs text-destructive">{proctoring.error}</p> : null}
-        </Card>
+            {proctoring.error ? <p className="w-full text-xs text-destructive">{proctoring.error}</p> : null}
+          </Card>
 
-        <Card className="p-8 mb-4 shadow-lg">
-          <div className="flex items-start justify-between mb-6">
-            <h2 className="text-2xl font-semibold">{t("test.question", { number: currentQuestion + 1 })}</h2>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleFlag}
-              className={flagged.has(currentQuestion) ? "text-destructive" : ""}
-            >
-              <Flag className="h-4 w-4" />
-            </Button>
-          </div>
-
-          {language !== "en" ? <p className="mb-4 text-sm text-muted-foreground">{t("test.englishBank")}</p> : null}
-          <p className="text-lg mb-6 leading-relaxed">{question.question}</p>
-
-          {question.imageUrl ? (
-            <div className="mb-8 flex justify-center rounded-lg border bg-muted/30 p-4">
-              <img
-                src={question.imageUrl}
-                alt={t("test.diagramAlt")}
-                className="max-h-48 w-full max-w-md object-contain"
-              />
+          <Card className="p-5 shadow-sm md:p-8">
+            <div className="mb-6 flex items-start justify-between gap-4 border-b border-border pb-4">
+              <div>
+                <p className="text-sm font-medium text-secondary">{t("test.questionOf", { current: currentQuestion + 1, total: questions.length })}</p>
+                <h2 className="mt-1 text-xl font-semibold md:text-2xl">{t("test.question", { number: currentQuestion + 1 })}</h2>
+              </div>
+              <Button
+                variant="outline"
+                size="icon"
+                aria-label={t("test.flagQuestion")}
+                onClick={toggleFlag}
+                className={flagged.has(currentQuestion) ? "border-destructive text-destructive" : ""}
+              >
+                <Flag className="h-4 w-4" />
+              </Button>
             </div>
-          ) : null}
 
-          <div className="space-y-3">
-            {question.options.map((option) => (
-              <button
-                key={option.id}
-                onClick={() => handleAnswer(question.id, option.id)}
-                className={`w-full p-4 rounded-lg border-2 transition-all text-left ${
-                  selectedAnswer === option.id
-                    ? "border-primary bg-primary/5"
-                    : "border-border hover:border-primary/50 bg-card"
-                }`}
-              >
-                <span className="font-semibold mr-3">{option.id}.</span>
-                <span>{option.text}</span>
-              </button>
-            ))}
-          </div>
-        </Card>
+            {language !== "en" ? <p className="mb-4 text-sm text-muted-foreground">{t("test.englishBank")}</p> : null}
+            <p className="mb-6 text-base leading-relaxed md:text-lg">{question.question}</p>
 
-        <div className="flex gap-4 justify-between">
-          <Button variant="outline" onClick={handlePrevious} disabled={currentQuestion === 0}>
-            <ChevronLeft className="mr-2 h-4 w-4" />
-            {t("test.previous")}
-          </Button>
+            {question.imageUrl ? (
+              <div className="mb-6 flex justify-center rounded-md border bg-muted/30 p-4">
+                <img
+                  src={question.imageUrl}
+                  alt={t("test.diagramAlt")}
+                  className="max-h-56 w-full max-w-lg object-contain"
+                />
+              </div>
+            ) : null}
 
-          {currentQuestion === questions.length - 1 ? (
-            <Button onClick={() => void handleSubmit()} size="lg" disabled={submitting}>
-              {submitting ? t("test.submitting") : t("test.submit")}
-            </Button>
-          ) : (
-            <Button onClick={handleNext}>
-              {t("test.next")}
-              <ChevronRight className="ml-2 h-4 w-4" />
-            </Button>
-          )}
-        </div>
+            <div className="space-y-2.5">
+              {question.options.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  aria-pressed={selectedAnswer === option.id}
+                  onClick={() => handleAnswer(question.id, option.id)}
+                  className={`flex w-full items-start gap-3 rounded-md border px-4 py-3.5 text-left transition-colors ${
+                    selectedAnswer === option.id
+                      ? "border-secondary bg-secondary/10"
+                      : "border-border bg-card hover:border-secondary/50 hover:bg-secondary/5"
+                  }`}
+                >
+                  <span className={`grid h-5 w-5 shrink-0 place-items-center rounded-full border text-xs font-semibold ${
+                    selectedAnswer === option.id
+                      ? "border-secondary bg-secondary text-secondary-foreground"
+                      : "border-muted-foreground/50 text-muted-foreground"
+                  }`}>
+                    {option.id}
+                  </span>
+                  <span className="pt-0.5 text-sm leading-5">{option.text}</span>
+                </button>
+              ))}
+            </div>
 
-        <Card className="p-6 mt-6 shadow-lg">
-          <h3 className="font-semibold mb-4">{t("test.navigator")}</h3>
-          <div className="grid grid-cols-10 gap-2">
-            {questions.map((q, idx) => (
-              <button
-                key={q.id}
-                onClick={() => setCurrentQuestion(idx)}
-                className={`aspect-square rounded-md text-sm font-medium transition-colors ${
-                  currentQuestion === idx
-                    ? "bg-primary text-primary-foreground"
-                    : answers[q.id]
-                      ? "bg-success/20 text-success-foreground hover:bg-success/30"
-                      : "bg-muted hover:bg-muted/80"
-                } ${flagged.has(idx) ? "ring-2 ring-destructive" : ""}`}
-              >
-                {idx + 1}
-              </button>
-            ))}
-          </div>
-        </Card>
+            <div className="mt-7 flex items-center justify-between gap-3 border-t border-border pt-5">
+              <Button variant="outline" onClick={handlePrevious} disabled={currentQuestion === 0}>
+                <ChevronLeft className="mr-2 h-4 w-4" />
+                {t("test.previous")}
+              </Button>
+
+              {currentQuestion === questions.length - 1 ? (
+                <Button onClick={() => void handleSubmit()} disabled={submitting}>
+                  {submitting ? t("test.submitting") : t("test.submit")}
+                </Button>
+              ) : (
+                <Button onClick={handleNext}>
+                  {t("test.next")}
+                  <ChevronRight className="ml-2 h-4 w-4" />
+                </Button>
+              )}
+            </div>
+          </Card>
+        </section>
       </div>
     </div>
   );

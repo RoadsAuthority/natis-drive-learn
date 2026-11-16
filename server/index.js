@@ -5,15 +5,17 @@ import multer from "multer";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { z } from "zod";
+import rateLimit from "express-rate-limit";
 import { neon } from "@neondatabase/serverless";
 import { mkdir, writeFile, readdir, readFile } from "node:fs/promises";
 import { readFileSync } from "node:fs";
 import { createServer } from "node:http";
 import path from "node:path";
-import { randomUUID } from "node:crypto";
+import { randomUUID, timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "node:url";
 import { addDays, buildScheduleState, deriveReviewFlag, failRebookAfter } from "./lib/testSchedule.js";
 import { TEST_QUESTION_LIMIT, formatQuestionForClient, gradeAnswersByQuestionIds } from "./lib/questions.js";
+import { idNumberSchema, loginSchema, registrationSchema } from "./lib/authValidation.js";
 
 const serverDir = path.dirname(fileURLToPath(import.meta.url));
 const envCandidates = [path.resolve(serverDir, ".env")];
@@ -69,14 +71,16 @@ function readEnvValue(key) {
 const app = express();
 const port = Number(process.env.PORT ?? readEnvValue("PORT") ?? 3001);
 const frontendOrigin = process.env.FRONTEND_ORIGIN ?? readEnvValue("FRONTEND_ORIGIN") ?? "http://localhost:8080";
-const jwtSecret = process.env.JWT_SECRET ?? readEnvValue("JWT_SECRET") ?? "replace-this-in-production";
+const jwtSecret = process.env.JWT_SECRET ?? readEnvValue("JWT_SECRET");
 const databaseUrl = process.env.DATABASE_URL ?? readEnvValue("DATABASE_URL");
-const adminEmailSet = new Set(
-  (process.env.ADMIN_EMAILS ?? readEnvValue("ADMIN_EMAILS") ?? "")
-    .split(",")
-    .map((s) => s.trim().toLowerCase())
-    .filter(Boolean)
-);
+const adminSetupKey = process.env.ADMIN_SETUP_KEY ?? readEnvValue("ADMIN_SETUP_KEY");
+
+if (!jwtSecret || Buffer.byteLength(jwtSecret, "utf8") < 32) {
+  throw new Error("JWT_SECRET must be configured with at least 32 bytes of random data.");
+}
+if (adminSetupKey && Buffer.byteLength(adminSetupKey, "utf8") < 32) {
+  throw new Error("ADMIN_SETUP_KEY must contain at least 32 bytes of random data.");
+}
 
 if (!databaseUrl) {
   throw new Error("Missing DATABASE_URL in environment variables.");
@@ -86,6 +90,32 @@ const sql = neon(databaseUrl);
 const upload = multer({ storage: multer.memoryStorage() });
 const uploadsDir = path.resolve(serverDir, "uploads");
 const roadsAuthDir = path.resolve(process.cwd(), "RoadsAuth");
+
+if (process.env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+}
+
+const registrationLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { message: "Too many registration attempts. Try again later." },
+});
+const signInLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { message: "Too many sign-in attempts. Try again later." },
+});
+const adminBootstrapLimiter = rateLimit({
+  windowMs: 60 * 60 * 1000,
+  limit: 5,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { message: "Too many admin setup attempts. Try again later." },
+});
 
 app.use(
   cors({
@@ -146,18 +176,43 @@ app.get("/api/study-materials/list", async (_req, res) => {
   }
 });
 
-function authMiddleware(req, res, next) {
+async function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
   if (!authHeader?.startsWith("Bearer ")) {
     return res.status(401).json({ message: "Missing bearer token." });
   }
   const token = authHeader.slice("Bearer ".length);
+  let payload;
   try {
-    const payload = jwt.verify(token, jwtSecret);
-    req.user = payload;
-    return next();
+    payload = jwt.verify(token, jwtSecret, { issuer: "natis-api", audience: "natis-web" });
+    if (
+      !payload ||
+      typeof payload.sub !== "string" ||
+      typeof payload.email !== "string" ||
+      !["candidate", "admin"].includes(payload.role) ||
+      !Number.isInteger(payload.ver)
+    ) {
+      return res.status(401).json({ message: "Invalid token." });
+    }
   } catch {
     return res.status(401).json({ message: "Invalid token." });
+  }
+
+  try {
+    const [profile] = await sql`
+      select email, role, auth_token_version
+      from profiles
+      where id = ${payload.sub}
+      limit 1
+    `;
+    if (!profile || profile.auth_token_version !== payload.ver) {
+      return res.status(401).json({ message: "Session is no longer valid." });
+    }
+    req.user = { sub: payload.sub, email: profile.email, role: profile.role };
+    return next();
+  } catch (error) {
+    console.error("Session verification failed:", error instanceof Error ? error.message : String(error));
+    return res.status(500).json({ message: "Could not verify this session." });
   }
 }
 
@@ -316,85 +371,147 @@ async function persistProctoringSnapshots(profileId, snapshots = []) {
   return stored;
 }
 
-app.post("/api/auth/register", async (req, res) => {
-  const schema = z.object({
-    email: z.string().email(),
-    password: z.string().min(6),
-    first_name: z.string().optional(),
-    surname: z.string().optional(),
-    id_number: z.string().trim().regex(/^\d+$/),
-  });
-  const parsed = schema.safeParse(req.body);
-  if (!parsed.success) {
-    return res.status(400).json({ message: "Invalid registration payload." });
-  }
+function isUniqueViolation(error) {
+  return error?.code === "23505" || error?.cause?.code === "23505";
+}
 
-  const { email, password, first_name, surname, id_number } = parsed.data;
-  const existing = await sql`select id from profiles where email = ${email} limit 1`;
-  if (existing.length) {
-    return res.status(409).json({ message: "Email already exists." });
-  }
-
-  const role = adminEmailSet.has(email.toLowerCase()) ? "admin" : "candidate";
-  const passwordHash = await bcrypt.hash(password, 10);
+async function insertProfile(registration, role) {
+  const passwordHash = await bcrypt.hash(registration.password, 12);
   const rows = await sql`
     insert into profiles (email, password_hash, first_name, surname, id_number, role)
-    values (${email}, ${passwordHash}, ${first_name ?? null}, ${surname ?? null}, ${id_number ?? null}, ${role})
-    returning id, email, role
+    values (
+      ${registration.email},
+      ${passwordHash},
+      ${registration.first_name},
+      ${registration.surname},
+      ${registration.id_number},
+      ${role}
+    )
+    returning id, email, role, auth_token_version
   `;
-  const profile = rows[0];
-  const token = jwt.sign({ sub: profile.id, role: profile.role, email: profile.email }, jwtSecret, {
-    expiresIn: "7d",
-  });
-  return res.status(201).json({
-    token,
-    user: { id: profile.id, email: profile.email },
-  });
+  return rows[0];
+}
+
+function createAccessToken(profile) {
+  return jwt.sign(
+    {
+      sub: profile.id,
+      role: profile.role,
+      email: profile.email,
+      ver: profile.auth_token_version,
+    },
+    jwtSecret,
+    { expiresIn: "1h", issuer: "natis-api", audience: "natis-web" },
+  );
+}
+
+function validSetupKey(received) {
+  if (!adminSetupKey || typeof received !== "string") return false;
+  const expectedBuffer = Buffer.from(adminSetupKey, "utf8");
+  const receivedBuffer = Buffer.from(received, "utf8");
+  return expectedBuffer.length === receivedBuffer.length && timingSafeEqual(expectedBuffer, receivedBuffer);
+}
+
+app.post("/api/auth/register", registrationLimiter, async (req, res) => {
+  const parsed = registrationSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ message: "Invalid registration details. Check each field and try again." });
+  }
+
+  try {
+    const registration = parsed.data;
+    const existing = await sql`
+      select id from profiles
+      where lower(email) = ${registration.email} or id_number = ${registration.id_number}
+      limit 1
+    `;
+    if (existing.length) {
+      return res.status(409).json({ message: "That email address or ID number is already registered." });
+    }
+
+    const profile = await insertProfile(registration, "candidate");
+    const token = createAccessToken(profile);
+    return res.status(201).json({
+      token,
+      user: { id: profile.id, email: profile.email },
+    });
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      return res.status(409).json({ message: "That email address or ID number is already registered." });
+    }
+    console.error("Registration failed:", error instanceof Error ? error.message : String(error));
+    return res.status(500).json({ message: "Registration failed. Please try again later." });
+  }
 });
 
-app.post("/api/auth/login", async (req, res) => {
-  const schema = z.object({
-    idNumber: z.string().trim().regex(/^\d+$/),
-    password: z.string().min(1),
-  });
-  const parsed = schema.safeParse(req.body);
+app.post("/api/auth/bootstrap-admin", adminBootstrapLimiter, async (req, res) => {
+  if (!adminSetupKey) {
+    return res.status(404).json({ message: "Admin setup is disabled." });
+  }
+  if (!validSetupKey(req.get("x-admin-setup-key"))) {
+    return res.status(401).json({ message: "Invalid admin setup key." });
+  }
+
+  const parsed = registrationSchema.safeParse(req.body);
   if (!parsed.success) {
-    return res.status(400).json({ message: "Invalid login payload." });
+    return res.status(400).json({ message: "Invalid admin details. Check each field and try again." });
+  }
+
+  try {
+    const [existingAdmin] = await sql`select id from profiles where role = 'admin' limit 1`;
+    if (existingAdmin) {
+      return res.status(409).json({ message: "An admin account already exists. Admin setup is one-time." });
+    }
+    const profile = await insertProfile(parsed.data, "admin");
+    return res.status(201).json({ message: "Admin account created. Sign in at /login using its ID number." });
+  } catch (error) {
+    if (isUniqueViolation(error)) {
+      return res.status(409).json({ message: "That email address or ID number is already registered." });
+    }
+    console.error("Admin bootstrap failed:", error instanceof Error ? error.message : String(error));
+    return res.status(500).json({ message: "Admin setup failed. Please try again later." });
+  }
+});
+
+app.post("/api/auth/login", signInLimiter, async (req, res) => {
+  const parsed = loginSchema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ message: "Enter your ID number and password." });
   }
   const { idNumber, password } = parsed.data;
   try {
     const rows = await sql`
-      select id, email, role, password_hash
+      select id, email, role, password_hash, auth_token_version
       from profiles
       where id_number = ${idNumber}
       limit 1
     `;
-    if (!rows.length) {
-      return res.status(401).json({ message: "Invalid credentials." });
+    if (!rows.length || !rows[0].password_hash) {
+      return res.status(401).json({ message: "Invalid ID number or password." });
     }
     const profile = rows[0];
-    if (!profile.password_hash) {
-      return res.status(401).json({ message: "Invalid credentials." });
-    }
     const valid = await bcrypt.compare(password, profile.password_hash);
     if (!valid) {
-      return res.status(401).json({ message: "Invalid credentials." });
+      return res.status(401).json({ message: "Invalid ID number or password." });
     }
-    const token = jwt.sign({ sub: profile.id, role: profile.role, email: profile.email }, jwtSecret, {
-      expiresIn: "7d",
-    });
+    const token = createAccessToken(profile);
     return res.json({
       token,
       user: { id: profile.id, email: profile.email },
     });
   } catch (error) {
-    const message = error instanceof Error ? error.message : String(error);
-    console.error("Login failed:", message);
-    return res.status(500).json({ message: "Login failed. Check the API server logs and database connection." });
+    console.error("Login failed:", error instanceof Error ? error.message : String(error));
+    return res.status(500).json({ message: "Login failed. Please try again later." });
   }
 });
 
-app.post("/api/auth/logout", (_req, res) => {
+app.post("/api/auth/logout", authMiddleware, async (req, res) => {
+  await sql`
+    update profiles
+    set auth_token_version = auth_token_version + 1,
+        updated_at = now()
+    where id = ${req.user.sub}
+  `;
   return res.status(204).send();
 });
 

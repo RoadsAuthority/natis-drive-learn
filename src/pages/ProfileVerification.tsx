@@ -103,8 +103,8 @@ export default function ProfileVerification() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background p-6">
-      <div className="mx-auto max-w-3xl">
+    <div className="w-full">
+      <div className="mx-auto max-w-5xl">
         <Card className="p-6 space-y-6">
           <h1 className="text-2xl font-bold">{t("verify.title")}</h1>
           <form className="space-y-4" onSubmit={handleSubmit}>

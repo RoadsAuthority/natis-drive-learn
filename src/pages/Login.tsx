@@ -27,7 +27,7 @@ const Login = () => {
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!loginData.idNumber || !loginData.password) {
+    if (!loginData.idNumber.trim() || !loginData.password) {
       toast.error(t("login.fillAll"));
       return;
     }
@@ -42,6 +42,10 @@ const Login = () => {
         return;
       }
       const profile = await refresh();
+      if (!profile) {
+        toast.error(t("login.profileLoadFailed"));
+        return;
+      }
       toast.success(t("login.loginSuccess"));
       navigate(profile?.role === "admin" ? "/admin" : "/portal");
     } catch (error) {
@@ -51,25 +55,39 @@ const Login = () => {
 
   const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!Object.values(registerData).every((val) => val)) {
+    const firstName = registerData.firstName.trim();
+    const surname = registerData.surname.trim();
+    const email = registerData.email.trim().toLowerCase();
+    const idNumber = registerData.idNumber.trim();
+    if (!firstName || !surname || !email || !idNumber || !registerData.password) {
       toast.error(t("login.fillAll"));
       return;
     }
-    if (!/^\d+$/.test(registerData.idNumber.trim())) {
+    if (!/^\d{1,32}$/.test(idNumber)) {
       toast.error(t("login.idDigitsOnly"));
       return;
     }
+    if (registerData.password.length < 12 || new TextEncoder().encode(registerData.password).length > 72) {
+      toast.error(t("login.passwordMin"));
+      return;
+    }
     try {
-      const { error } = await signUp(registerData.email, registerData.password, {
-        first_name: registerData.firstName,
-        surname: registerData.surname,
-        id_number: registerData.idNumber,
+      const { error } = await signUp({
+        email,
+        password: registerData.password,
+        firstName,
+        surname,
+        idNumber,
       });
       if (error) {
         toast.error(error.message);
         return;
       }
       const profile = await refresh();
+      if (!profile) {
+        toast.error(t("login.profileLoadFailed"));
+        return;
+      }
       toast.success(t("login.registerSuccess"));
       navigate(profile?.role === "admin" ? "/admin" : "/portal");
     } catch (error) {
@@ -108,6 +126,10 @@ const Login = () => {
                     id="login-id-number"
                     type="text"
                     inputMode="numeric"
+                    pattern="[0-9]{1,32}"
+                    maxLength={32}
+                    autoComplete="off"
+                    required
                     value={loginData.idNumber}
                     onChange={(e) => setLoginData({ ...loginData, idNumber: e.target.value })}
                     placeholder={t("login.idNumberPlaceholder")}
@@ -118,6 +140,8 @@ const Login = () => {
                   <Input
                     id="login-password"
                     type="password"
+                    autoComplete="current-password"
+                    required
                     value={loginData.password}
                     onChange={(e) => setLoginData({ ...loginData, password: e.target.value })}
                     placeholder={t("login.passwordPlaceholder")}
@@ -137,6 +161,9 @@ const Login = () => {
                     <Label htmlFor="first-name">{t("login.firstName")}</Label>
                     <Input
                       id="first-name"
+                      autoComplete="given-name"
+                      maxLength={100}
+                      required
                       value={registerData.firstName}
                       onChange={(e) =>
                         setRegisterData({ ...registerData, firstName: e.target.value })
@@ -148,6 +175,9 @@ const Login = () => {
                     <Label htmlFor="surname">{t("login.surname")}</Label>
                     <Input
                       id="surname"
+                      autoComplete="family-name"
+                      maxLength={100}
+                      required
                       value={registerData.surname}
                       onChange={(e) =>
                         setRegisterData({ ...registerData, surname: e.target.value })
@@ -160,7 +190,12 @@ const Login = () => {
                   <Label htmlFor="id-number">{t("login.idNumber")}</Label>
                   <Input
                     id="id-number"
-                      inputMode="numeric"
+                    type="text"
+                    inputMode="numeric"
+                    pattern="[0-9]{1,32}"
+                    maxLength={32}
+                    autoComplete="off"
+                    required
                     value={registerData.idNumber}
                     onChange={(e) =>
                       setRegisterData({ ...registerData, idNumber: e.target.value })
@@ -173,6 +208,9 @@ const Login = () => {
                   <Input
                     id="register-email"
                     type="email"
+                    maxLength={320}
+                    autoComplete="email"
+                    required
                     value={registerData.email}
                     onChange={(e) =>
                       setRegisterData({ ...registerData, email: e.target.value })
@@ -185,6 +223,10 @@ const Login = () => {
                   <Input
                     id="register-password"
                     type="password"
+                    minLength={12}
+                    maxLength={72}
+                    autoComplete="new-password"
+                    required
                     value={registerData.password}
                     onChange={(e) =>
                       setRegisterData({ ...registerData, password: e.target.value })

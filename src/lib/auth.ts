@@ -15,6 +15,14 @@ export type Session = {
   user: SessionUser;
 };
 
+export type RegistrationInput = {
+  email: string;
+  password: string;
+  firstName: string;
+  surname: string;
+  idNumber: string;
+};
+
 export type UserProfile = {
   id: string;
   email: string;
@@ -46,12 +54,7 @@ export type UserProfile = {
 
 export async function signIn(idNumber: string, password: string) {
   if (!isApiConfigured()) {
-    const fallback: Session = {
-      token: "local-dev-token",
-      user: { id: "local-user", email: idNumber },
-    };
-    localStorage.setItem("session", JSON.stringify(fallback));
-    return { error: null };
+    return { error: { message: "Sign-in is unavailable until the authentication API is configured." } };
   }
   try {
     const response = await apiRequest<Session>("/api/auth/login", {
@@ -65,19 +68,20 @@ export async function signIn(idNumber: string, password: string) {
   }
 }
 
-export async function signUp(email: string, password: string, metadata: Record<string, string>) {
+export async function signUp(input: RegistrationInput) {
   if (!isApiConfigured()) {
-    const fallback: Session = {
-      token: "local-dev-token",
-      user: { id: "local-user", email },
-    };
-    localStorage.setItem("session", JSON.stringify(fallback));
-    return { error: null };
+    return { error: { message: "Registration is unavailable until the authentication API is configured." } };
   }
   try {
     const response = await apiRequest<Session>("/api/auth/register", {
       method: "POST",
-      body: { email, password, ...metadata },
+      body: {
+        email: input.email,
+        password: input.password,
+        first_name: input.firstName,
+        surname: input.surname,
+        id_number: input.idNumber,
+      },
     });
     localStorage.setItem("session", JSON.stringify(response));
     return { error: null };
@@ -87,67 +91,49 @@ export async function signUp(email: string, password: string, metadata: Record<s
 }
 
 export async function signOut() {
-  const session = localStorage.getItem("session");
+  const rawSession = localStorage.getItem("session");
   localStorage.removeItem("session");
-  if (!isApiConfigured() || !session) {
+  if (!isApiConfigured() || !rawSession) {
     return;
   }
-  const parsed = JSON.parse(session) as Session;
-  await apiRequest("/api/auth/logout", {
-    method: "POST",
-    token: parsed.token,
-  });
+  try {
+    const parsed = JSON.parse(rawSession) as Session;
+    if (parsed.token) {
+      await apiRequest("/api/auth/logout", {
+        method: "POST",
+        token: parsed.token,
+      });
+    }
+  } catch {
+    // The local session is already cleared; the access token expires within one hour.
+  }
 }
 
 export async function getSession(): Promise<Session | null> {
+  if (!isApiConfigured()) {
+    localStorage.removeItem("session");
+    return null;
+  }
   const raw = localStorage.getItem("session");
   if (!raw) {
     return null;
   }
-  return JSON.parse(raw) as Session;
+  try {
+    const parsed = JSON.parse(raw) as Session;
+    if (!parsed.token || parsed.token === "local-dev-token" || !parsed.user?.id || !parsed.user.email) {
+      localStorage.removeItem("session");
+      return null;
+    }
+    return parsed;
+  } catch {
+    localStorage.removeItem("session");
+    return null;
+  }
 }
 
 export async function getProfile(): Promise<UserProfile | null> {
   const session = await getSession();
   if (!session) return null;
-
-  if (!isApiConfigured()) {
-    const local = localStorage.getItem("profile");
-    if (!local) {
-      return {
-        id: session.user.id,
-        email: session.user.email,
-        first_name: null,
-        surname: null,
-        id_number: null,
-        licence_code: null,
-        role: "candidate",
-        verification_status: "pending",
-        rejection_reason: null,
-        eye_test_status: (localStorage.getItem("eyeTestStatus") as EyeTestStatus) ?? "pending",
-        payment_status: (localStorage.getItem("paymentStatus") as PaymentStatus) ?? "pending",
-      };
-    }
-    const parsed = JSON.parse(local) as {
-      firstName?: string;
-      surname?: string;
-      idNumber?: string;
-      licenceCode?: string;
-    };
-    return {
-      id: session.user.id,
-      email: session.user.email,
-      first_name: parsed.firstName ?? null,
-      surname: parsed.surname ?? null,
-      id_number: parsed.idNumber ?? null,
-      licence_code: parsed.licenceCode ?? null,
-      role: "candidate",
-      verification_status: "pending",
-      rejection_reason: null,
-      eye_test_status: (localStorage.getItem("eyeTestStatus") as EyeTestStatus) ?? "pending",
-      payment_status: (localStorage.getItem("paymentStatus") as PaymentStatus) ?? "pending",
-    };
-  }
 
   return apiRequest<UserProfile>("/api/profile/me", { token: session.token });
 }

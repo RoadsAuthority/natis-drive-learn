@@ -30,8 +30,9 @@ npm install
 PORT=3001
 FRONTEND_ORIGIN=http://localhost:8080
 DATABASE_URL="postgresql://..."
-JWT_SECRET=your-long-secret
-ADMIN_EMAILS=your-email@example.com
+# Generate separate random values; leave ADMIN_SETUP_KEY unset after first admin setup.
+JWT_SECRET=
+ADMIN_SETUP_KEY=
 ```
 
 **Root `.env`** (copy from `.env.example`):
@@ -50,6 +51,8 @@ npm run dev:all
 
 - App: http://localhost:8080  
 - API health: http://localhost:3001/api/health  
+
+Signup collects email and ID number; sign-in uses ID number and password only. After migrations, create the first admin once via `POST /api/auth/bootstrap-admin` using the setup key, then remove `ADMIN_SETUP_KEY` from the API environment. Sign in at `/login`; the protected admin URL is http://localhost:8080/admin (Vite may select another port if 8080 is occupied). See [server/README.md](./server/README.md#first-admin).
 
 ## Cloud deployment
 

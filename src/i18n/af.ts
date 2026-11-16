@@ -5,6 +5,13 @@ type DeepString<T> = {
 };
 
 export const af = {
+  workspace: {
+    learner: "Leerlingportaal",
+    section: "Werkruimte",
+    openNavigation: "Maak navigasie oop",
+    closeNavigation: "Maak navigasie toe",
+    learnerFallback: "Leerling",
+  },
   language: {
     welcome: "Welkom by die Aanlyn Leerlinglisensie-stelsel",
     tagline: "Veilige paaie na voorspoed",
@@ -34,8 +41,10 @@ export const af = {
     idNumber: "ID-nommer",
     idNumberPlaceholder: "Voer jou ID-nommer in",
     idDigitsOnly: "Voer jou ID-nommer met slegs syfers in.",
+    passwordMin: "Gebruik 'n wagwoord met minstens 12 karakters.",
     email: "E-pos",
     passwordCreate: "Skep 'n wagwoord",
+    profileLoadFailed: "Jou rekening kon nie geverifieer word nie. Meld asseblief weer aan.",
     fillAll: "Vul asseblief alle velde in",
     loginSuccess: "Aanmelding suksesvol!",
     registerSuccess: "Registrasie suksesvol! Kyk jou e-pos vir bevestiging indien nodig.",
@@ -224,6 +233,8 @@ export const af = {
     needConsent: "Lees eers die instruksies en stem in tot webkameramonitering.",
   },
   test: {
+    timeRemaining: "Tyd oor",
+    flagQuestion: "Merk vraag vir hersiening",
     loading: "Laai jou toetsvrae…",
     questionOf: "Vraag {current} van {total}",
     monitoring: "Monitering aktief",

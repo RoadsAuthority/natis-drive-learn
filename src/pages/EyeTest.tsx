@@ -47,8 +47,8 @@ export default function EyeTest() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background p-6">
-      <div className="mx-auto max-w-2xl space-y-6">
+    <div className="w-full">
+      <div className="mx-auto max-w-4xl space-y-6">
         <Card className="p-6 space-y-4">
           <h1 className="text-2xl font-bold flex items-center gap-2">
             <Eye className="h-5 w-5" /> {t("eye.title")}

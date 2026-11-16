@@ -9,7 +9,6 @@ import {
   Clock,
   Eye,
   FileCheck2,
-  LogOut,
   Shield,
   User,
   Award,
@@ -17,12 +16,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Progress } from "@/components/ui/progress";
 import { useAuthContext } from "@/components/auth/AuthProvider";
 import { useEligibility } from "@/hooks/useEligibility";
 import { formatDateShort } from "@/lib/formatDate";
 import { useLanguage } from "@/i18n/LanguageProvider";
-import LanguageSwitcher from "@/components/LanguageSwitcher";
 
 type StepStatus = "done" | "in_review" | "action_needed" | "locked";
 
@@ -54,7 +51,7 @@ function statusBadgeVariant(status: StepStatus): "default" | "secondary" | "outl
 
 export default function Portal() {
   const navigate = useNavigate();
-  const { user, profile, logout, refresh } = useAuthContext();
+  const { profile, refresh } = useAuthContext();
   const { language, languages, locale, t, usingFallback } = useLanguage();
   const selectedLanguage = languages.find((item) => item.code === language);
   const {
@@ -154,11 +151,6 @@ export default function Portal() {
     },
   ];
 
-  const handleLogout = async () => {
-    await logout();
-    navigate("/login");
-  };
-
   const progressPercent = (completedStepCount / totalSteps) * 100;
 
   useEffect(() => {
@@ -166,34 +158,12 @@ export default function Portal() {
   }, [refresh]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background p-6">
-      <div className="mx-auto max-w-2xl space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold tracking-tight">{t("portal.title")}</h1>
-            <p className="text-sm text-muted-foreground">{user?.email}</p>
-          </div>
-          <div className="flex flex-wrap items-center gap-2">
-            <LanguageSwitcher />
-            <Button variant="outline" size="sm" onClick={() => navigate("/my-profile")}>
-              <User className="mr-2 h-4 w-4" />
-              {t("portal.profile")}
-            </Button>
-            {testPassed ? (
-              <Button variant="outline" size="sm" onClick={() => navigate("/certificate")}>
-                <Award className="mr-2 h-4 w-4" />
-                {t("portal.certificate")}
-              </Button>
-            ) : null}
-            <Button variant="outline" size="sm" onClick={() => void refresh()}>
-              {t("portal.refresh")}
-            </Button>
-            <Button variant="ghost" size="sm" onClick={() => void handleLogout()}>
-              <LogOut className="mr-2 h-4 w-4" />
-              {t("portal.signOut")}
-            </Button>
-          </div>
-        </div>
+    <div className="w-full space-y-6">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <Button variant="outline" size="sm" onClick={() => void refresh()}>
+          {t("portal.refresh")}
+        </Button>
+      </div>
 
         {usingFallback && selectedLanguage ? (
           <p className="text-sm text-muted-foreground">
@@ -241,14 +211,31 @@ export default function Portal() {
         ) : (
           <>
             {!profileRejected ? (
-              <Card className="p-4 space-y-3">
-                <div className="flex items-center justify-between gap-2 text-sm">
-                  <span className="font-medium">{t("portal.progress")}</span>
-                  <span className="text-muted-foreground">
-                    {t("portal.progressCount", { done: completedStepCount, total: totalSteps })}
-                  </span>
+              <Card className="border-0 bg-primary p-6 text-primary-foreground shadow-sm">
+                <div className="flex items-start justify-between gap-4">
+                  <div>
+                    <p className="text-sm font-medium text-white/75">{t("portal.progress")}</p>
+                    <p className="mt-1 text-3xl font-semibold tabular-nums">
+                      {completedStepCount}<span className="mx-1 text-white/55">/</span>{totalSteps}
+                    </p>
+                  </div>
+                  <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full border-2 border-white/35 text-sm font-semibold">
+                    {Math.round(progressPercent)}%
+                  </div>
                 </div>
-                <Progress value={progressPercent} />
+                <div
+                  role="progressbar"
+                  aria-label={t("portal.progress")}
+                  aria-valuenow={Math.round(progressPercent)}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  className="mt-5 h-2 overflow-hidden rounded-full bg-white/20"
+                >
+                  <div className="h-full rounded-full bg-white transition-all" style={{ width: `${progressPercent}%` }} />
+                </div>
+                <p className="mt-2 text-xs text-white/75">
+                  {t("portal.progressCount", { done: completedStepCount, total: totalSteps })}
+                </p>
               </Card>
             ) : null}
 
@@ -281,7 +268,7 @@ export default function Portal() {
                 <FileCheck2 className="h-5 w-5 text-primary" />
                 {t("portal.journey")}
               </h2>
-              <ol className="space-y-4">
+              <ol className="grid gap-3 md:grid-cols-2">
                 {steps.map((step) => {
                   const locked = step.status === "locked";
 
@@ -290,12 +277,12 @@ export default function Portal() {
                       key={step.key}
                       className={`flex gap-3 rounded-lg border p-4 ${
                         step.status === "done"
-                          ? "border-success/30 bg-success/5"
+                          ? "border-success/25 bg-success/5"
                           : step.status === "in_review"
                             ? "border-amber-500/30 bg-amber-500/5"
                             : locked
-                              ? "opacity-60"
-                              : ""
+                              ? "border-border bg-muted/40 opacity-65"
+                              : "border-primary/25 bg-accent/35"
                       }`}
                     >
                       <div className="pt-0.5">
@@ -345,6 +332,5 @@ export default function Portal() {
           ) : null}
         </div>
       </div>
-    </div>
   );
 }

@@ -46,8 +46,8 @@ export default function Certificate() {
   if (!data) return null;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background p-6 print:bg-white print:p-0">
-      <div className="mx-auto max-w-3xl space-y-6 print:max-w-none">
+    <div className="w-full print:bg-white print:p-0">
+      <div className="mx-auto w-full max-w-5xl space-y-6 print:max-w-none">
         <div className="flex flex-wrap items-center justify-between gap-3 print:hidden">
           <Button variant="ghost" onClick={() => navigate("/my-profile")}>
             <ArrowLeft className="mr-2 h-4 w-4" />

@@ -2,11 +2,12 @@ create extension if not exists "pgcrypto";
 
 create table if not exists profiles (
   id uuid primary key default gen_random_uuid(),
-  email text unique not null,
+  email text not null check (email = lower(btrim(email))),
   password_hash text not null,
+  auth_token_version integer not null default 0 check (auth_token_version >= 0),
   first_name text,
   surname text,
-  id_number text,
+  id_number text not null check (id_number ~ '^[0-9]{1,32}$'),
   licence_code text,
   role text not null default 'candidate' check (role in ('candidate', 'admin')),
   verification_status text not null default 'pending' check (verification_status in ('pending', 'approved', 'rejected')),
@@ -77,7 +78,9 @@ create table if not exists admin_audit_logs (
   created_at timestamptz not null default now()
 );
 
-create index if not exists idx_profiles_email on profiles(email);
+create unique index if not exists idx_profiles_email_lower on profiles (lower(email));
+create unique index if not exists idx_profiles_id_number on profiles (id_number);
+create unique index if not exists idx_profiles_single_admin on profiles ((role)) where role = 'admin';
 create index if not exists idx_bookings_profile_id on bookings(profile_id);
 create index if not exists idx_attempts_profile_id on attempts(profile_id);
 create index if not exists idx_payments_profile_id on payments(profile_id);

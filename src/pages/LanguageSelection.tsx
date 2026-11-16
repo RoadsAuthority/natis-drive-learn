@@ -14,14 +14,14 @@ const LanguageSelection = () => {
     <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background flex items-center justify-center p-4">
       <div className="w-full max-w-2xl">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary/10 mb-4">
-            <Globe className="w-10 h-10 text-primary" />
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary text-primary-foreground ring-4 ring-destructive/20 mb-4">
+            <Globe className="w-10 h-10" />
           </div>
           <h1 className="text-4xl font-bold text-foreground mb-3">{t("language.welcome")}</h1>
           <p className="text-lg text-muted-foreground">{t("language.tagline")}</p>
         </div>
 
-        <Card className="p-8 shadow-lg">
+        <Card className="p-8 shadow-lg border-t-4 border-t-destructive">
           <h2 className="text-2xl font-semibold mb-6 text-center">{t("language.heading")}</h2>
 
           <div className="space-y-3">
@@ -34,9 +34,9 @@ const LanguageSelection = () => {
                 aria-pressed={language === lang.code}
                 className={`w-full p-4 rounded-lg border-2 transition-all text-left disabled:cursor-not-allowed disabled:opacity-60 ${
                   language === lang.code
-                    ? "border-primary bg-primary/5"
+                    ? "border-secondary bg-secondary text-secondary-foreground shadow-sm"
                     : lang.translated
-                      ? "border-border hover:border-primary/50 bg-card"
+                      ? "border-border hover:border-secondary/60 hover:bg-secondary/5 bg-card"
                       : "border-border bg-muted/40"
                 }`}
               >
@@ -60,7 +60,7 @@ const LanguageSelection = () => {
             type="button"
             variant="outline"
             size="lg"
-            className="w-full mt-3 text-lg"
+            className="w-full mt-3 text-lg border-destructive text-destructive hover:bg-destructive hover:text-destructive-foreground"
             onClick={() => navigate("/study")}
           >
             <BookOpen className="mr-2 h-5 w-5" />

@@ -85,7 +85,7 @@ cd natis-drive-learn
 npm install
 
 # 3. Copy and fill in environment files
-#    server/.env  → DATABASE_URL, JWT_SECRET, ADMIN_EMAILS
+#    server/.env  → DATABASE_URL, JWT_SECRET, ADMIN_SETUP_KEY
 #    .env         → VITE_API_BASE_URL=http://localhost:3001
 
 # 4. One-time database setup
@@ -110,14 +110,14 @@ For cloud deployment (Vercel + Render + Neon), see **[DEPLOY.md](./DEPLOY.md)**.
 
 Use **two browser windows** — one normal, one **Incognito/Private** — so you can be admin and candidate at the same time.
 
-| Account | Email | Role | After login go to |
-|---------|-------|------|-------------------|
-| **Verifier** | Must match `ADMIN_EMAILS` on Render (e.g. `verifier@school.edu`) | Admin | `/admin` |
-| **Learner** | Any other email (e.g. `learner@example.com`) | Candidate | `/portal` |
+| Account | Sign-in ID | Role | After login go to |
+|---------|-----------|------|-------------------|
+| **Verifier** | ID number set during one-time admin setup | Admin | `/admin` |
+| **Learner** | Numeric ID number set during signup | Candidate | `/portal` |
 
 **Passwords:** whatever you chose at registration. There is no default password.
 
-**Important:** Register the admin account **after** `ADMIN_EMAILS` is set on Render, or that account will not get admin access.
+**Important:** Create the first admin once through `/api/auth/bootstrap-admin`, then remove `ADMIN_SETUP_KEY` from Render and redeploy. Public signup always creates candidates.
 
 ---
 
@@ -220,7 +220,7 @@ Use this when time is short. Pre-stage: candidate already verified, eye test don
 | Portal empty after login | Run `npm run db:migrate` on the database |
 | Camera blocked | Use HTTPS (live Vercel URL) or localhost — not plain HTTP |
 | No demo payment button | Set `VITE_ALLOW_SANDBOX_PAYMENT=true` on Vercel, then redeploy |
-| Admin console empty | Register admin **after** `ADMIN_EMAILS` is set on Render |
+| Admin console empty | Create the first admin through `/api/auth/bootstrap-admin`, then sign in with that account's ID number |
 | Admin attempts error | Run `npm run db:migrate` or `node server/scripts/fix-schema.mjs` |
 | Wrong time on retake message | Redeploy latest frontend and API (times use local clock) |
 

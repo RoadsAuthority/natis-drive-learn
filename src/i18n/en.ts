@@ -1,4 +1,11 @@
 export const en = {
+  workspace: {
+    learner: "Learner portal",
+    section: "Workspace",
+    openNavigation: "Open navigation",
+    closeNavigation: "Close navigation",
+    learnerFallback: "Learner",
+  },
   language: {
     welcome: "Welcome to the Online Learner Licence System",
     tagline: "Safe roads to prosperity",
@@ -28,8 +35,10 @@ export const en = {
     idNumber: "ID Number",
     idNumberPlaceholder: "Enter your ID number",
     idDigitsOnly: "Enter your ID number using digits only.",
+    passwordMin: "Use a password with at least 12 characters.",
     email: "Email",
     passwordCreate: "Create a password",
+    profileLoadFailed: "Your account could not be verified. Please sign in again.",
     fillAll: "Please fill in all fields",
     loginSuccess: "Login successful!",
     registerSuccess: "Registration successful! Check email for confirmation if required.",
@@ -218,6 +227,8 @@ export const en = {
     needConsent: "Read the instructions and consent to webcam monitoring first.",
   },
   test: {
+    timeRemaining: "Time remaining",
+    flagQuestion: "Flag question for review",
     loading: "Loading your test questions…",
     questionOf: "Question {current} of {total}",
     monitoring: "Monitoring active",

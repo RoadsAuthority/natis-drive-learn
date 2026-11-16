@@ -27,9 +27,9 @@ npm run seed:questions -- --replace
 | Variable | Example |
 |----------|---------|
 | `DATABASE_URL` | `postgresql://...` (quoted if it contains `&`) |
-| `JWT_SECRET` | long random string |
+| `JWT_SECRET` | at least 32 cryptographically random bytes |
 | `FRONTEND_ORIGIN` | `https://your-app.vercel.app` (set after step 3) |
-| `ADMIN_EMAILS` | `you@school.edu` |
+| `ADMIN_SETUP_KEY` | temporary 32+ byte random secret; remove after initial admin setup |
 | `PORT` | leave empty (Render sets it) |
 
 5. Deploy. Note the URL, e.g. `https://natis-drive-learn-api.onrender.com`.
@@ -61,11 +61,13 @@ Verify: open `https://YOUR-API.onrender.com/api/health` → `"ok": true`.
 
 SPA routing is handled by `vercel.json` (rewrites all routes to `index.html`).
 
-## 4. First login
+## 4. Initial admin setup
 
-1. Register with an email listed in `ADMIN_EMAILS` → verifier console at `/admin`.
-2. Register a second account as a **candidate** → complete the portal flow.
-3. As admin, approve the candidate, then continue booking and test on the candidate account.
+1. Run `npm run db:migrate` after clearing/recreating the database.
+2. Call `POST /api/auth/bootstrap-admin` once from a trusted machine with the `x-admin-setup-key` header and the admin's email, ID number, name, and unique password.
+3. Remove `ADMIN_SETUP_KEY` from Render and redeploy the API.
+4. Open `/login`, sign in with the admin ID number and password, then use `/admin` (for example, `https://your-app.vercel.app/admin`).
+5. Create ordinary users through signup; public signups are candidates and must be approved through the admin console.
 
 ## 5. Local development
 
@@ -80,7 +82,7 @@ npm run dev
 Or: `npm run dev:all`
 
 Root `.env`: `VITE_API_BASE_URL=http://localhost:3001`  
-`server/.env`: `DATABASE_URL`, `JWT_SECRET`, `ADMIN_EMAILS`
+`server/.env`: `DATABASE_URL`, `JWT_SECRET`, and `ADMIN_SETUP_KEY` only during initial admin setup
 
 ## Troubleshooting
 

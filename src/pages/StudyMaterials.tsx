@@ -3,13 +3,15 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, BookOpen, FileText, ExternalLink } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
+import { useLanguage } from "@/i18n/LanguageProvider";
 
 type StudyFile = { name: string; url: string };
 
 const apiBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ?? "";
 
-export default function StudyMaterials() {
+export default function StudyMaterials({ embedded = false }: { embedded?: boolean }) {
   const navigate = useNavigate();
+  const { t } = useLanguage();
   const [files, setFiles] = useState<StudyFile[]>([]);
   const [error, setError] = useState<string | null>(null);
 
@@ -27,11 +29,11 @@ export default function StudyMaterials() {
   const href = (rel: string) => `${apiBase}${rel}`;
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background p-6">
-      <div className="mx-auto max-w-2xl space-y-6">
-        <Button variant="ghost" onClick={() => navigate("/")} className="mb-2">
+    <div className={embedded ? "w-full" : "min-h-screen bg-background p-6"}>
+      <div className={`mx-auto space-y-6 ${embedded ? "max-w-6xl" : "max-w-3xl"}`}>
+        <Button variant="ghost" onClick={() => navigate(embedded ? "/portal" : "/")} className="mb-2">
           <ArrowLeft className="mr-2 h-4 w-4" />
-          Back
+          {embedded ? t("profile.back") : "Back"}
         </Button>
 
         <Card className="p-6 space-y-4">

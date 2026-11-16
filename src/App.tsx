@@ -24,8 +24,21 @@ import { LanguageProvider } from "./i18n/LanguageProvider";
 import Portal from "./pages/Portal";
 import CandidateProfile from "./pages/CandidateProfile";
 import Certificate from "./pages/Certificate";
+import LearnerWorkspace from "./components/layout/LearnerWorkspace";
+import { useAuthContext } from "./components/auth/AuthProvider";
 
 const queryClient = new QueryClient();
+
+function StudyRoute() {
+  const { user, profile } = useAuthContext();
+  const page = user && profile?.role === "candidate" ? (
+    <LearnerWorkspace><StudyMaterials embedded /></LearnerWorkspace>
+  ) : (
+    <StudyMaterials />
+  );
+
+  return <NonAdminRoute>{page}</NonAdminRoute>;
+}
 
 const App = () => (
   <QueryClientProvider client={queryClient}>
@@ -39,18 +52,14 @@ const App = () => (
             <Route path="/" element={<LanguageSelection />} />
             <Route
               path="/study"
-              element={
-                <NonAdminRoute>
-                  <StudyMaterials />
-                </NonAdminRoute>
-              }
+              element={<StudyRoute />}
             />
             <Route path="/login" element={<Login />} />
             <Route
               path="/portal"
               element={
                 <ProtectedRoute role="candidate">
-                  <Portal />
+                    <LearnerWorkspace><Portal /></LearnerWorkspace>
                 </ProtectedRoute>
               }
             />
@@ -58,7 +67,7 @@ const App = () => (
               path="/my-profile"
               element={
                 <ProtectedRoute role="candidate">
-                  <CandidateProfile />
+                  <LearnerWorkspace><CandidateProfile /></LearnerWorkspace>
                 </ProtectedRoute>
               }
             />
@@ -66,7 +75,7 @@ const App = () => (
               path="/certificate"
               element={
                 <ProtectedRoute role="candidate">
-                  <Certificate />
+                  <LearnerWorkspace><Certificate /></LearnerWorkspace>
                 </ProtectedRoute>
               }
             />
@@ -74,7 +83,7 @@ const App = () => (
               path="/profile-verification"
               element={
                 <ProtectedRoute role="candidate">
-                  <ProfileVerification />
+                  <LearnerWorkspace><ProfileVerification /></LearnerWorkspace>
                 </ProtectedRoute>
               }
             />
@@ -84,7 +93,7 @@ const App = () => (
               element={
                 <ProtectedRoute role="candidate">
                   <NotRejectedRoute>
-                    <EyeTest />
+                    <LearnerWorkspace><EyeTest /></LearnerWorkspace>
                   </NotRejectedRoute>
                 </ProtectedRoute>
               }
@@ -94,7 +103,7 @@ const App = () => (
               element={
                 <ProtectedRoute role="candidate">
                   <BookingReadyRoute>
-                    <Booking />
+                    <LearnerWorkspace><Booking /></LearnerWorkspace>
                   </BookingReadyRoute>
                 </ProtectedRoute>
               }
@@ -104,7 +113,7 @@ const App = () => (
               element={
                 <ProtectedRoute role="candidate">
                   <VerifiedOnlyRoute>
-                    <TestInstructions />
+                    <LearnerWorkspace><TestInstructions /></LearnerWorkspace>
                   </VerifiedOnlyRoute>
                 </ProtectedRoute>
               }
@@ -114,7 +123,7 @@ const App = () => (
               element={
                 <ProtectedRoute role="candidate">
                   <VerifiedOnlyRoute>
-                    <Test />
+                    <LearnerWorkspace><Test /></LearnerWorkspace>
                   </VerifiedOnlyRoute>
                 </ProtectedRoute>
               }
@@ -123,7 +132,7 @@ const App = () => (
               path="/results"
               element={
                 <ProtectedRoute role="candidate">
-                  <Results />
+                  <LearnerWorkspace><Results /></LearnerWorkspace>
                 </ProtectedRoute>
               }
             />
