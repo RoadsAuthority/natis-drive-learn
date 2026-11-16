@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { toast } from "sonner";
 import { AlertCircle, Camera, CheckCircle2, Clock, FileText } from "lucide-react";
 import { useLanguage } from "@/i18n/LanguageProvider";
@@ -15,16 +16,25 @@ const TestInstructions = () => {
   const [step, setStep] = useState<Step>("instructions");
   const [agreed, setAgreed] = useState(false);
   const [monitoringConsent, setMonitoringConsent] = useState(false);
+  const [launchDialogOpen, setLaunchDialogOpen] = useState(false);
+  const [launching, setLaunching] = useState(false);
 
   const handleStartTest = async () => {
-    if (!agreed || !monitoringConsent) {
+    if (!agreed || !monitoringConsent || !launchDialogOpen) {
       toast.error(t("instructions.needConsent"));
       return;
     }
+    if (!document.fullscreenEnabled || !document.documentElement.requestFullscreen) {
+      toast.error(t("instructions.fullscreenRequired"));
+      return;
+    }
+    setLaunching(true);
     try {
       await document.documentElement.requestFullscreen();
     } catch {
-      // Fullscreen is best-effort; tab visibility is still monitored.
+      setLaunching(false);
+      toast.error(t("instructions.fullscreenRequired"));
+      return;
     }
     sessionStorage.setItem("natis-proctoring-consent", "true");
     navigate("/test");
@@ -124,12 +134,38 @@ const TestInstructions = () => {
             <div className="space-y-6 text-center">
               <CheckCircle2 className="mx-auto h-12 w-12 text-success" />
               <p className="text-lg">{t("instructions.ready")}</p>
-              <Button onClick={() => void handleStartTest()} size="lg" className="w-full text-lg">
+              <Button onClick={() => setLaunchDialogOpen(true)} size="lg" className="w-full text-lg">
                 {t("instructions.start")}
               </Button>
             </div>
           ) : null}
         </Card>
+
+        <Dialog open={launchDialogOpen} onOpenChange={setLaunchDialogOpen}>
+          <DialogContent
+            onEscapeKeyDown={(event) => event.preventDefault()}
+            onPointerDownOutside={(event) => event.preventDefault()}
+          >
+            <DialogHeader>
+              <DialogTitle>{t("instructions.integrityTitle")}</DialogTitle>
+              <DialogDescription>{t("instructions.integrityBody")}</DialogDescription>
+            </DialogHeader>
+            <ul className="list-disc space-y-2 pl-5 text-sm text-foreground">
+              <li>{t("instructions.integrityFullscreen")}</li>
+              <li>{t("instructions.integrityFocus")}</li>
+              <li>{t("instructions.integrityClipboard")}</li>
+              <li>{t("instructions.integrityStrikes")}</li>
+            </ul>
+            <DialogFooter>
+              <Button type="button" variant="outline" disabled={launching} onClick={() => setLaunchDialogOpen(false)}>
+                {t("instructions.cancel")}
+              </Button>
+              <Button type="button" disabled={launching} onClick={() => void handleStartTest()}>
+                {launching ? t("instructions.launching") : t("instructions.agreeStart")}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

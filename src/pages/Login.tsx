@@ -96,17 +96,17 @@ const Login = () => {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background flex items-center justify-center p-3 sm:p-4">
       <div className="w-full max-w-md">
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <Button variant="ghost" onClick={() => navigate("/")}>
+        <div className="mb-4 flex flex-col items-start justify-between gap-2 sm:flex-row sm:items-center sm:gap-3">
+          <Button variant="ghost" className="max-w-full justify-start px-2 sm:px-4" onClick={() => navigate("/")}>
             <ArrowLeft className="mr-2 h-4 w-4" />
-            {t("login.back")}
+            <span className="truncate">{t("login.back")}</span>
           </Button>
           <LanguageSwitcher />
         </div>
 
-        <Card className="p-8 shadow-lg">
+        <Card className="p-5 shadow-lg sm:p-8">
           <div className="text-center mb-6">
             <h1 className="text-3xl font-bold text-foreground">{t("login.title")}</h1>
             <p className="text-muted-foreground mt-2">{t("login.subtitle")}</p>
@@ -156,7 +156,7 @@ const Login = () => {
 
             <TabsContent value="register">
               <form onSubmit={handleRegister} className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                   <div>
                     <Label htmlFor="first-name">{t("login.firstName")}</Label>
                     <Input

@@ -1,6 +1,7 @@
 import { apiRequest, isApiConfigured } from "@/lib/api";
 import { getSession } from "@/lib/auth";
 import type { TestQuestion } from "@/types/question";
+import type { TestViolationType } from "@/types/proctoring";
 
 function assertApiConfigured() {
   if (!isApiConfigured()) {
@@ -88,7 +89,7 @@ export async function saveAttempt(
   total: number,
   percentage: number,
   passed: boolean,
-  proctoring?: { tabSwitches: number; faceMissingEvents: number; snapshots: string[] }
+  proctoring?: { tabSwitches: number; faceMissingEvents: number; violationCount: number; snapshots: string[] }
 ) {
   const token = await withToken();
   return apiRequest<{
@@ -118,6 +119,7 @@ export async function postTestSessionHeartbeat(payload: {
     ok: boolean;
     startedAt: string | null;
     timeRemainingSeconds: number;
+    violationCount: number;
   }>("/api/test-session/heartbeat", {
     method: "POST",
     token,
@@ -130,6 +132,15 @@ export async function endTestSession() {
   await apiRequest("/api/test-session/end", {
     method: "POST",
     token,
+  });
+}
+
+export async function recordTestViolation(violationType: TestViolationType, questionNumber: number) {
+  const token = await withToken();
+  return apiRequest<{ recorded: boolean; violationCount: number }>("/api/test-session/violations", {
+    method: "POST",
+    token,
+    body: { violationType, questionNumber },
   });
 }
 

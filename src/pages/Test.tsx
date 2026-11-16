@@ -4,7 +4,14 @@ import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Camera, Clock, ChevronLeft, ChevronRight, Flag } from "lucide-react";
-import { fetchQuestions, markAttempt, saveAttempt, postTestSessionHeartbeat, endTestSession } from "@/lib/natisApi";
+import {
+  fetchQuestions,
+  markAttempt,
+  saveAttempt,
+  postTestSessionHeartbeat,
+  recordTestViolation,
+  endTestSession,
+} from "@/lib/natisApi";
 import { useTestProctoring } from "@/hooks/useTestProctoring";
 import { useLanguage } from "@/i18n/LanguageProvider";
 import type { TestQuestion } from "@/types/question";
@@ -23,11 +30,28 @@ const Test = () => {
   const [loadingQuestions, setLoadingQuestions] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const submittingRef = useRef(false);
+  const autoSubmitRef = useRef<() => void>(() => {});
   const consentGranted = sessionStorage.getItem("natis-proctoring-consent") === "true";
-  const proctoring = useTestProctoring({ enabled: consentGranted, snapshotIntervalMs: 30000 });
+  const progressRef = useRef({ currentQuestion: 0, answers: {} as Record<string, string>, totalQuestions: 0 });
+  const proctoring = useTestProctoring({
+    enabled: consentGranted,
+    snapshotIntervalMs: 30000,
+    onViolation: async (violationType) => {
+      try {
+        const result = await recordTestViolation(violationType, Math.max(1, progressRef.current.currentQuestion + 1));
+        return result.violationCount;
+      } catch {
+        toast.error(tRef.current("test.integrityLogFailed"));
+        return undefined;
+      }
+    },
+    onThreeStrikes: () => {
+      toast.error(tRef.current("test.integrityDisqualified"));
+      autoSubmitRef.current();
+    },
+  });
   const proctoringRef = useRef(proctoring);
   proctoringRef.current = proctoring;
-  const progressRef = useRef({ currentQuestion: 0, answers: {} as Record<string, string>, totalQuestions: 0 });
   progressRef.current = {
     currentQuestion,
     answers,
@@ -93,6 +117,7 @@ const Test = () => {
           setTimeRemaining(session.timeRemainingSeconds);
           setTimerSynced(true);
         }
+        proctoringRef.current.syncViolationCount(session.violationCount);
       } catch {
         // Monitoring must not block the test.
       }
@@ -156,6 +181,7 @@ const Test = () => {
       toast.error((error as Error).message);
     }
   }, [answers, navigate, proctoring, questions]);
+  autoSubmitRef.current = () => void handleSubmit();
 
   useEffect(() => {
     if (!timerSynced) return;
@@ -219,7 +245,38 @@ const Test = () => {
   }
 
   return (
-    <div className="w-full">
+    <div
+      className="w-full"
+      onCopy={(event) => {
+        event.preventDefault();
+        proctoring.recordViolation("copy");
+      }}
+      onCut={(event) => {
+        event.preventDefault();
+        proctoring.recordViolation("cut");
+      }}
+      onPaste={(event) => {
+        event.preventDefault();
+        proctoring.recordViolation("paste");
+      }}
+      onContextMenu={(event) => {
+        event.preventDefault();
+        proctoring.recordViolation("context_menu");
+      }}
+    >
+      {proctoring.violationCount > 0 ? (
+        <Card
+          role="alert"
+          aria-live="assertive"
+          className={`mb-4 border p-4 text-sm ${
+            proctoring.violationCount >= 3
+              ? "border-destructive/50 bg-destructive/10 text-destructive"
+              : "border-amber-500/40 bg-amber-500/10 text-foreground"
+          }`}
+        >
+          {t("test.integrityWarning", { count: proctoring.violationCount })}
+        </Card>
+      ) : null}
       <div className="grid items-start gap-5 xl:grid-cols-[260px_minmax(0,1fr)]">
         <aside className="space-y-4 xl:sticky xl:top-24">
           <Card className="overflow-hidden border-0 bg-primary p-0 text-primary-foreground shadow-sm">

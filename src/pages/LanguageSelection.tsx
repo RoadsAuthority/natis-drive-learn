@@ -11,17 +11,17 @@ const LanguageSelection = () => {
   const selected = languages.find((item) => item.code === language);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background flex items-center justify-center p-3 sm:p-4">
       <div className="w-full max-w-2xl">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-20 h-20 rounded-full bg-primary text-primary-foreground ring-4 ring-destructive/20 mb-4">
             <Globe className="w-10 h-10" />
           </div>
-          <h1 className="text-4xl font-bold text-foreground mb-3">{t("language.welcome")}</h1>
+          <h1 className="mb-3 text-3xl font-bold text-foreground sm:text-4xl">{t("language.welcome")}</h1>
           <p className="text-lg text-muted-foreground">{t("language.tagline")}</p>
         </div>
 
-        <Card className="p-8 shadow-lg border-t-4 border-t-destructive">
+        <Card className="border-t-4 border-t-destructive p-5 shadow-lg sm:p-8">
           <h2 className="text-2xl font-semibold mb-6 text-center">{t("language.heading")}</h2>
 
           <div className="space-y-3">

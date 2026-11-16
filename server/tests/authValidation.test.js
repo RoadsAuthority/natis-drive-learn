@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { loginSchema, registrationSchema } from "../lib/authValidation.js";
+import { computeSuspicionScore, deriveReviewFlag } from "../lib/testSchedule.js";
 
 const validRegistration = {
   email: "Candidate@Example.com",
@@ -40,4 +41,11 @@ test("login requires a numeric ID number and rejects email-based login", () => {
 test("registration enforces password length and bcrypt byte limits", () => {
   assert.equal(registrationSchema.safeParse({ ...validRegistration, password: "short" }).success, false);
   assert.equal(registrationSchema.safeParse({ ...validRegistration, password: "é".repeat(37) }).success, false);
+});
+
+test("three logged integrity events flag an attempt for review", () => {
+  const summary = { tabSwitches: 0, faceMissingEvents: 0, violationCount: 3 };
+  const suspicionScore = computeSuspicionScore(summary);
+  assert.equal(suspicionScore, 75);
+  assert.equal(deriveReviewFlag(summary, suspicionScore), true);
 });

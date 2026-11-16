@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Users, FileText, BarChart3, ShieldCheck, Calendar, RefreshCw, LogOut, Radio } from "lucide-react";
+import { Users, FileText, BarChart3, ShieldCheck, Calendar, RefreshCw, LogOut, Radio, UserRound } from "lucide-react";
 import {
   fetchAdminAudit,
   fetchAdminAttempts,
@@ -41,6 +41,7 @@ const AdminDashboard = () => {
   const [liveTests, setLiveTests] = useState<LiveTestSession[]>([]);
   const [audit, setAudit] = useState<Record<string, unknown>[]>([]);
   const [loading, setLoading] = useState(true);
+  const [activeTab, setActiveTab] = useState("live");
   const [rejectTarget, setRejectTarget] = useState<VerificationQueueRow | null>(null);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectSubmitting, setRejectSubmitting] = useState(false);
@@ -117,7 +118,7 @@ const AdminDashboard = () => {
     }
   };
 
-  const { logout } = useAuthContext();
+  const { logout, profile, user } = useAuthContext();
 
   const handleLogout = async () => {
     await logout();
@@ -128,16 +129,30 @@ const AdminDashboard = () => {
     stats && stats.totalAttempts > 0
       ? Math.round((stats.passedAttempts / stats.totalAttempts) * 100)
       : 0;
+  const adminName = [profile?.first_name, profile?.surname].filter(Boolean).join(" ") || "Administrator";
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background p-6">
+    <div className="min-h-screen bg-gradient-to-br from-background via-accent/20 to-background p-3 sm:p-6">
       <div className="max-w-7xl mx-auto space-y-6">
-        <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-start">
           <div>
-            <h1 className="text-4xl font-bold">Verifier console</h1>
+            <h1 className="text-2xl font-bold sm:text-4xl">Verifier console</h1>
             <p className="text-muted-foreground">Review candidates, bookings, and test attempts.</p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex w-full flex-wrap gap-2 sm:w-auto sm:justify-end">
+            <Button
+              variant="outline"
+              className="h-auto min-w-0 flex-1 justify-start gap-3 py-2 sm:flex-none"
+              onClick={() => setActiveTab("profile")}
+            >
+              <span className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+                {(profile?.first_name?.[0] ?? user?.email?.[0] ?? "A").toUpperCase()}
+              </span>
+              <span className="grid text-left">
+                <span className="text-sm font-medium">{adminName}</span>
+                <span className="max-w-48 truncate text-xs text-muted-foreground">{profile?.email ?? user?.email}</span>
+              </span>
+            </Button>
             <Button variant="outline" onClick={() => void loadAll()} disabled={loading}>
               <RefreshCw className={`mr-2 h-4 w-4 ${loading ? "animate-spin" : ""}`} />
               Refresh
@@ -196,13 +211,14 @@ const AdminDashboard = () => {
           </Card>
         </div>
 
-        <Tabs defaultValue="live" className="space-y-4">
-          <TabsList className="grid w-full max-w-4xl grid-cols-5">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <TabsList className="grid w-full max-w-5xl grid-cols-2 sm:grid-cols-3 lg:grid-cols-6">
             <TabsTrigger value="live">Live tests</TabsTrigger>
             <TabsTrigger value="verification">Verification</TabsTrigger>
             <TabsTrigger value="bookings">Bookings</TabsTrigger>
             <TabsTrigger value="attempts">Attempts</TabsTrigger>
             <TabsTrigger value="audit">Audit</TabsTrigger>
+            <TabsTrigger value="profile">Admin profile</TabsTrigger>
           </TabsList>
           <TabsContent value="live">
             <Card className="p-6 space-y-4">
@@ -408,6 +424,49 @@ const AdminDashboard = () => {
                   ))}
                 </ul>
               )}
+            </Card>
+          </TabsContent>
+          <TabsContent value="profile">
+            <Card className="max-w-3xl p-6">
+              <div className="flex flex-wrap items-start justify-between gap-4 border-b border-border pb-5">
+                <div className="flex items-center gap-4">
+                  <div className="grid h-14 w-14 place-items-center rounded-full bg-primary text-lg font-semibold text-primary-foreground">
+                    {(profile?.first_name?.[0] ?? user?.email?.[0] ?? "A").toUpperCase()}
+                  </div>
+                  <div>
+                    <h2 className="text-xl font-semibold">
+                      {[profile?.first_name, profile?.surname].filter(Boolean).join(" ") || "Admin profile"}
+                    </h2>
+                    <p className="text-sm text-muted-foreground">Account details</p>
+                  </div>
+                </div>
+                <Badge className="bg-primary text-primary-foreground">Administrator</Badge>
+              </div>
+
+              <dl className="grid gap-x-8 sm:grid-cols-2">
+                <div className="border-b border-border py-4">
+                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Full name</dt>
+                  <dd className="mt-1 font-medium">
+                    {[profile?.first_name, profile?.surname].filter(Boolean).join(" ") || "—"}
+                  </dd>
+                </div>
+                <div className="border-b border-border py-4">
+                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Email</dt>
+                  <dd className="mt-1 break-all font-medium">{profile?.email ?? user?.email ?? "—"}</dd>
+                </div>
+                <div className="border-b border-border py-4">
+                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">ID number</dt>
+                  <dd className="mt-1 font-mono font-medium">{profile?.id_number ?? "—"}</dd>
+                </div>
+                <div className="border-b border-border py-4">
+                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Role</dt>
+                  <dd className="mt-1 font-medium">{profile?.role ?? "admin"}</dd>
+                </div>
+                <div className="border-b border-border py-4 sm:col-span-2">
+                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Account ID</dt>
+                  <dd className="mt-1 break-all font-mono text-sm">{profile?.id ?? user?.id ?? "—"}</dd>
+                </div>
+              </dl>
             </Card>
           </TabsContent>
         </Tabs>

@@ -13,7 +13,7 @@ import { createServer } from "node:http";
 import path from "node:path";
 import { randomUUID, timingSafeEqual } from "node:crypto";
 import { fileURLToPath } from "node:url";
-import { addDays, buildScheduleState, deriveReviewFlag, failRebookAfter } from "./lib/testSchedule.js";
+import { addDays, buildScheduleState, computeSuspicionScore, deriveReviewFlag, failRebookAfter } from "./lib/testSchedule.js";
 import { TEST_QUESTION_LIMIT, formatQuestionForClient, gradeAnswersByQuestionIds } from "./lib/questions.js";
 import { idNumberSchema, loginSchema, registrationSchema } from "./lib/authValidation.js";
 
@@ -115,6 +115,13 @@ const adminBootstrapLimiter = rateLimit({
   standardHeaders: "draft-8",
   legacyHeaders: false,
   message: { message: "Too many admin setup attempts. Try again later." },
+});
+const testViolationLimiter = rateLimit({
+  windowMs: 10 * 60 * 1000,
+  limit: 60,
+  standardHeaders: "draft-8",
+  legacyHeaders: false,
+  message: { message: "Too many test integrity events." },
 });
 
 app.use(
@@ -889,8 +896,8 @@ app.get("/api/questions/active", authMiddleware, async (req, res) => {
   return res.json(rows.map(formatQuestionForClient));
 });
 
-const LIVE_SESSION_STALE_SECONDS = 90;
 const TEST_DURATION_SECONDS = 60 * 60;
+const LIVE_SESSION_STALE_SECONDS = TEST_DURATION_SECONDS + 120;
 
 function testTimeRemainingSeconds(startedAt) {
   const elapsed = (Date.now() - new Date(startedAt).getTime()) / 1000;
@@ -958,10 +965,16 @@ app.post("/api/test-session/heartbeat", authMiddleware, async (req, res) => {
       returning started_at
     `;
     const startedAt = rows[0]?.started_at;
+    const [violationTotals] = await sql`
+      select count(*)::int as count
+      from test_session_violations
+      where profile_id = ${profileId} and session_started_at = ${startedAt}
+    `;
     return res.json({
       ok: true,
       startedAt: startedAt ? new Date(startedAt).toISOString() : null,
       timeRemainingSeconds: startedAt ? testTimeRemainingSeconds(startedAt) : TEST_DURATION_SECONDS,
+      violationCount: Number(violationTotals?.count ?? 0),
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : String(error);
@@ -971,6 +984,79 @@ app.post("/api/test-session/heartbeat", authMiddleware, async (req, res) => {
         ? "Live monitoring is unavailable until database migrations are applied."
         : "Could not update test session.",
     });
+  }
+});
+
+app.post("/api/test-session/violations", authMiddleware, testViolationLimiter, async (req, res) => {
+  if (req.user.role !== "candidate") {
+    return res.status(403).json({ message: "Only candidates can submit test integrity events." });
+  }
+  const schema = z
+    .object({
+      violationType: z.enum([
+        "tab_switch",
+        "window_blur",
+        "fullscreen_exit",
+        "copy",
+        "cut",
+        "paste",
+        "context_menu",
+      ]),
+      questionNumber: z.number().int().min(1).max(TEST_QUESTION_LIMIT),
+    })
+    .strict();
+  const parsed = schema.safeParse(req.body);
+  if (!parsed.success) {
+    return res.status(400).json({ message: "Invalid test integrity event." });
+  }
+
+  const profileId = req.user.sub;
+  const gate = await assertLearnerTestReady(profileId);
+  if (!gate.ok) {
+    return res.status(gate.status).json({ message: gate.message });
+  }
+
+  try {
+    await clearStaleTestSessions();
+    const [session] = await sql`
+      insert into active_test_sessions (
+        profile_id,
+        current_question,
+        total_questions,
+        answered_count,
+        tab_switches,
+        face_missing_events
+      )
+      values (${profileId}, ${parsed.data.questionNumber}, ${TEST_QUESTION_LIMIT}, 0, 0, 0)
+      on conflict (profile_id) do update set last_heartbeat_at = now()
+      returning started_at
+    `;
+
+    await sql`
+      insert into test_session_violations (
+        profile_id,
+        session_started_at,
+        violation_type,
+        question_number
+      )
+      values (
+        ${profileId},
+        ${session.started_at},
+        ${parsed.data.violationType},
+        ${parsed.data.questionNumber}
+      )
+    `;
+
+    const [violationTotals] = await sql`
+      select count(*)::int as count
+      from test_session_violations
+      where profile_id = ${profileId} and session_started_at = ${session.started_at}
+    `;
+
+    return res.status(201).json({ recorded: true, violationCount: Number(violationTotals?.count ?? 0) });
+  } catch (error) {
+    console.error("Test integrity event failed:", error instanceof Error ? error.message : String(error));
+    return res.status(503).json({ message: "Could not record this test integrity event." });
   }
 });
 
@@ -1000,7 +1086,20 @@ app.post("/api/attempts/mark", authMiddleware, async (req, res) => {
 
   const { answers } = parsed.data;
   if (!Object.keys(answers).length) {
-    return res.status(400).json({ message: "No answers submitted." });
+    try {
+      const [activeSession] = await sql`
+        select total_questions from active_test_sessions where profile_id = ${req.user.sub} limit 1
+      `;
+      return res.json({
+        score: 0,
+        total: Number(activeSession?.total_questions ?? TEST_QUESTION_LIMIT),
+        percentage: 0,
+        passed: false,
+      });
+    } catch (error) {
+      console.error("Empty attempt marking failed:", error instanceof Error ? error.message : String(error));
+      return res.status(500).json({ message: "Could not finalize the monitored test." });
+    }
   }
 
   try {
@@ -1027,6 +1126,7 @@ app.post("/api/attempts", authMiddleware, async (req, res) => {
       .object({
         tabSwitches: z.number().int().min(0).default(0),
         faceMissingEvents: z.number().int().min(0).default(0),
+        violationCount: z.number().int().min(0).optional(),
         snapshots: z.array(z.string()).max(5).optional(),
       })
       .optional(),
@@ -1038,14 +1138,27 @@ app.post("/api/attempts", authMiddleware, async (req, res) => {
   const profileId = req.user.sub;
   const { score, total, percentage, passed, proctoring } = parsed.data;
   const snapshotPaths = await persistProctoringSnapshots(profileId, proctoring?.snapshots ?? []);
-  const suspicionScore = (proctoring?.tabSwitches ?? 0) * 10 + (proctoring?.faceMissingEvents ?? 0) * 15;
+  const [activeSession] = await sql`
+    select started_at from active_test_sessions where profile_id = ${profileId} limit 1
+  `;
+  let violationCount = 0;
+  if (activeSession?.started_at) {
+    const [violationTotals] = await sql`
+      select count(*)::int as count
+      from test_session_violations
+      where profile_id = ${profileId} and session_started_at = ${activeSession.started_at}
+    `;
+    violationCount = Number(violationTotals?.count ?? 0);
+  }
   const proctoringSummary = {
     tabSwitches: proctoring?.tabSwitches ?? 0,
     faceMissingEvents: proctoring?.faceMissingEvents ?? 0,
+    violationCount,
     snapshotCount: snapshotPaths.length,
     snapshotPaths,
     recordedAt: new Date().toISOString(),
   };
+  const suspicionScore = computeSuspicionScore(proctoringSummary);
   const reviewFlagged = deriveReviewFlag(proctoringSummary, suspicionScore);
   const attemptAt = new Date();
   const nextTestEligibleAt = passed ? addDays(attemptAt, 21) : failRebookAfter(attemptAt);

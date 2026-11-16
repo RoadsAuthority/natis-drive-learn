@@ -114,6 +114,14 @@ function deriveReviewFlag(summary, suspicionScore) {
   return suspicionScore >= PROCTORING_REVIEW_THRESHOLD || tabSwitches >= 3 || faceMissingEvents >= 5;
 }
 
+function computeSuspicionScore(summary) {
+  return (
+    Number(summary?.tabSwitches ?? 0) * 10 +
+    Number(summary?.faceMissingEvents ?? 0) * 15 +
+    Number(summary?.violationCount ?? 0) * 25
+  );
+}
+
 export {
   RETAKE_MIN_DAYS,
   FAIL_REBOOK_MINUTES,
@@ -124,4 +132,5 @@ export {
   failRebookAfter,
   buildScheduleState,
   deriveReviewFlag,
+  computeSuspicionScore,
 };
