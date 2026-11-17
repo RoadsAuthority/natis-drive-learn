@@ -133,8 +133,8 @@ Use **two browser windows** — one normal, one **Incognito/Private** — so you
 | 4 | Switch to admin | Log in as verifier → `/admin` → **Verification** tab → View documents → **Approve**. |
 | 5 | Step 2 — Vision | Back to candidate → `/eye-test` → complete Snellen screening or upload doctor letter. |
 | 6 | Step 3 — Booking | Pick date and slot → use **Record demo payment** (no real PayPal needed) → confirm. |
-| 7 | Step 4 — Instructions | Read rules: 70 questions, 60 minutes, 80% pass → consent to webcam → Start test. |
-| 8 | `/test` | Answer a few questions. Point out timer, webcam, question navigator, flagging. |
+| 7 | Step 4 — Instructions | Read rules, consent to webcam monitoring, then review the mandatory fullscreen and integrity agreement. |
+| 8 | `/test` | Answer a few questions. Point out timer, webcam, question navigator, and the logged three-warning policy. |
 | 9 | Submit → `/results` | Show pass/fail screen, score, and next steps (certificate or retake wait). |
 | 10 | `/certificate` | Show downloadable learner certificate (if passed). |
 | 11 | `/study` | Optional: official PDF study materials. |
@@ -163,7 +163,7 @@ Use this when time is short. Pre-stage: candidate already verified, eye test don
 | 0:00 | Open live URL | "This is our online learner licence portal — learners apply, verify identity, and take the theory test from any browser." |
 | 0:30 | Show `/portal` | "Four clear steps: documents, vision, booking, and the theory test. Progress is tracked automatically." |
 | 1:00 | Quick flash of completed steps | "Identity is verified by staff before the learner can continue." |
-| 1:30 | Open `/test` (or start from instructions) | "The test has 70 questions, a 60-minute timer, and webcam monitoring — tab switches and missing face are flagged." |
+| 1:30 | Open `/test` (or start from instructions) | "The test requires fullscreen consent, records tab/focus/fullscreen and clipboard events, and submits on the third warning. This is monitoring, not kiosk lockdown." |
 | 2:30 | Answer 2–3 questions, show navigator | "Learners can move between questions and flag ones to review." |
 | 3:00 | Switch to admin `/admin` → Live tests | "While the test runs, verifiers see live progress on the admin dashboard." |
 | 3:30 | Submit test → `/results` | "Results are instant — pass or fail, with certificate or retake information." |
@@ -195,10 +195,12 @@ Use this when time is short. Pre-stage: candidate already verified, eye test don
 2. **Human verification** — real staff approve documents before testing.
 3. **Vision screening** — on-screen test or doctor letter upload.
 4. **Booking & payment** — slot selection with PayPal or demo payment.
-5. **Monitored theory test** — timed, webcam, anti-cheating signals (tab switches, face missing).
+5. **Monitored theory test** — fullscreen launch agreement, webcam, visibility/focus/fullscreen and clipboard event logging, three warnings before automatic submission.
 6. **Retake rules** — 5-minute wait after fail (demo); 3-week rule in production-style wording.
 7. **Certificate** — issued immediately on pass.
 8. **Admin oversight** — live tests, flagged attempts, audit log.
+
+**Integrity limitation:** A normal browser cannot prevent opening other tabs, switching applications, or using another device. The portal detects supported browser signals and stores them for verifier review; high-stakes remote exams need managed kiosk software or an in-person proctor.
 
 ---
 

@@ -13,6 +13,9 @@ Frontend now calls REST endpoints via `VITE_API_BASE_URL` and expects a Neon-bac
 - `POST /api/eye-test/submit` (multipart form-data)
 - `POST /api/bookings`
 - `GET /api/questions/active`
+- `POST /api/test-session/heartbeat`
+- `POST /api/test-session/violations`
+- `POST /api/test-session/end`
 - `POST /api/attempts/mark`
 - `POST /api/attempts`
 - `POST /api/results/document`
@@ -83,6 +86,16 @@ The learner test serves **70 random** active questions per attempt (`ORDER BY ra
    - `npm run seed:questions -- --replace` — delete all rows in `question_bank`, then insert (full reload)
 
 The learner test reads active rows from `question_bank` via `GET /api/questions/active`.
+
+## Test Integrity Monitoring
+
+Before the test launches, candidates must accept the integrity agreement. The start button requests browser fullscreen; if fullscreen is unavailable or denied, the test does not start. During the test, the client detects document visibility changes, window blur, and fullscreen exits. Copy, cut, paste, and the context menu are blocked inside the test UI. The browser cannot prevent a person from opening another tab, switching apps/devices, or bypassing client code; these controls are monitoring signals, not kiosk lockdown.
+
+Each supported event is sent to `POST /api/test-session/violations` with the active question number. The API derives candidate identity from the bearer token and stores the event in `test_session_violations`, associated with the active session start time. The endpoint accepts only known event types, requires an eligible candidate, and is rate limited. Heartbeats return the server-side event count so refreshing the page does not reset the strike count. Active test sessions are retained slightly longer than the 60-minute test duration.
+
+The first two events show warnings. On the third event, the client automatically submits the current answers; an unanswered test is recorded as a zero-score failure. Attempts use the persisted event count in the suspicion score and are flagged for verifier review. This is a deterrent and audit trail, not proof that no external assistance occurred.
+
+Apply `neon/migrations/20261116_test_integrity.sql` through `npm run db:migrate` before using this feature.
 
 ## First Admin
 

@@ -13,10 +13,13 @@ Full-stack assignment prototype: candidate registration, document verification, 
 - Candidate portal with step-by-step journey
 - Verifier console (approve/reject with reasons, bookings, flagged attempts, audit log)
 - Snellen-style vision screening + optional doctor letter
-- Timed theory test (70 questions, 80% pass) with webcam monitoring signals
+- Timed theory test (70 questions, 80% pass) with a fullscreen launch agreement, webcam monitoring, and a three-strike integrity warning flow
+- Test tab/focus/fullscreen and clipboard/context-menu events are logged to the API for verifier review
 - Retake rules: 3 weeks between passed attempts; **5-minute** wait after a fail (demo); collection date on pass
 - Candidate profile and certificate of achievement on pass
 - Study PDFs served from `RoadsAuth/`
+
+Browser integrity controls detect and log supported visibility, focus, fullscreen, and clipboard events; they cannot prevent opening other browser tabs, switching to other applications, or using another device. This is monitored testing, not kiosk lockdown.
 
 ## Quick start (local)
 

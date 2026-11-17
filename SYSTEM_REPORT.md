@@ -104,18 +104,18 @@ This ensures **no candidate reaches the theory test without human verification**
 - **No digital audit trail** of who answered what, when, or under what conditions  
 - Centres cannot easily see **live progress** across many candidates in one dashboard  
 
-Moving online is not just convenience — it is a structural shift from **physical paper + invigilator in the room** to **digital delivery + software-enforced rules**.
+Moving online is not just convenience — it is a structural shift from **physical paper + invigilator in the room** to **digital delivery + monitored integrity signals**.
 
 **Solution:** This portal delivers a **full online theory test** that replaces the handwritten paper experience while adding controls paper cannot offer:
 
 | Paper-based today | Online in this system |
 |-------------------|------------------------|
 | Write answers by hand | Select answers on screen; submit digitally |
-| Invigilator watches the room | **Webcam monitoring** + tab-switch and face-presence checks |
+| Invigilator watches the room | **Webcam monitoring** + browser visibility, focus, fullscreen, and face-presence signals |
 | Manual marking | **Server-side auto-grading** — instant score |
 | Results later | **Immediate pass/fail** on `/results` |
 | Fixed question order on paper | **70 random questions** per attempt; options shuffled |
-| No session telemetry | **Suspicion scoring** and flagged attempts for verifier review |
+| No session telemetry | **Durable violation logging**, suspicion scoring, and flagged attempts for verifier review |
 
 The monitored test includes:
 
@@ -123,13 +123,19 @@ The monitored test includes:
 |---------|-------------|
 | **Timed session** | 70 questions, 60 minutes, 80% pass threshold |
 | **Webcam monitoring** | Camera required; periodic snapshots captured |
-| **Tab-switch detection** | Leaving the test window is logged |
+| **Fullscreen launch agreement** | Candidate must agree and enter fullscreen before the test starts |
+| **Focus/visibility detection** | Tab visibility changes, window blur, and fullscreen exits are logged |
+| **Clipboard restrictions** | Copy, cut, paste, and the context menu are blocked inside the test UI and logged |
+| **Three-warning policy** | Third detected event automatically submits current answers for review |
+| **Server-side event log** | Candidate events are stored by active session and included in attempt suspicion scoring |
 | **Face-presence checks** | Missing or blank camera frames are flagged |
 | **Server-side grading** | Correct answers never sent to the browser |
 | **Randomised paper** | 70 random active questions per attempt; options shuffled |
 | **Suspicion scoring** | Sessions exceeding thresholds are flagged for verifier review |
 
 Verifiers can watch **live test sessions** on the admin dashboard and review **flagged attempts** after submission.
+
+**Browser limitation:** Web applications cannot prevent a candidate from opening another tab, switching to other applications/devices, or modifying client code. These controls are best-effort deterrence and audit signals, not kiosk lockdown or proof that outside assistance did not occur.
 
 ---
 
@@ -228,7 +234,7 @@ Optional at any time: **Study materials** for preparation.
 | Payments | PayPal integration; sandbox/demo mode |
 | Question bank | 70+ questions in Postgres; seed from JSON |
 | Theory test | Timed UI, navigator, flag-for-review, webcam panel |
-| Proctoring | Tab switches, face missing, snapshots, suspicion score |
+| Proctoring | Fullscreen consent, focus/visibility/clipboard event log, three-warning submit, face snapshots, server-side suspicion score |
 | Retake scheduling | Server-side eligibility dates |
 | Certificate | Printable learner certificate on pass |
 | Admin dashboard | Stats, queues, live tests, audit log |
