@@ -131,7 +131,12 @@ const Login = () => {
                     autoComplete="off"
                     required
                     value={loginData.idNumber}
-                    onChange={(e) => setLoginData({ ...loginData, idNumber: e.target.value })}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (/^\d{0,32}$/.test(value)) {
+                        setLoginData({ ...loginData, idNumber: value });
+                      }
+                    }}
                     placeholder={t("login.idNumberPlaceholder")}
                   />
                 </div>
@@ -197,9 +202,12 @@ const Login = () => {
                     autoComplete="off"
                     required
                     value={registerData.idNumber}
-                    onChange={(e) =>
-                      setRegisterData({ ...registerData, idNumber: e.target.value })
-                    }
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (/^\d{0,32}$/.test(value)) {
+                        setRegisterData({ ...registerData, idNumber: value });
+                      }
+                    }}
                     placeholder={t("login.idNumberPlaceholder")}
                   />
                 </div>

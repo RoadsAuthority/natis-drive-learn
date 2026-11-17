@@ -131,9 +131,19 @@ export default function ProfileVerification() {
                 <Label htmlFor="idNumber">{t("verify.idNumber")}</Label>
                 <Input
                   id="idNumber"
+                  type="text"
                   inputMode="numeric"
+                  pattern="[0-9]{1,32}"
+                  maxLength={32}
+                  autoComplete="off"
+                  required
                   value={formData.idNumber}
-                  onChange={(e) => setFormData({ ...formData, idNumber: e.target.value })}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (/^\d{0,32}$/.test(value)) {
+                      setFormData({ ...formData, idNumber: value });
+                    }
+                  }}
                 />
               </div>
               <div>
